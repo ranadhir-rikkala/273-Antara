@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -8,6 +7,7 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 from temporalio.client import Client
 
+from api.admission import BacklogGate, InflightLimit
 from common import storage
 from common.config import settings
 from common.db import pool
@@ -22,7 +22,9 @@ class AppState:
 
 
 app_state = AppState()
-inflight = asyncio.Semaphore(settings.max_inflight_requests)
+inflight = InflightLimit(settings.max_inflight_requests)
+ingest_gate = BacklogGate(INGEST_CPU, settings.max_ingest_backlog)
+agent_gate = BacklogGate(AGENT, settings.max_agent_backlog)
 
 
 @asynccontextmanager
@@ -55,10 +57,16 @@ def current_user(x_user_id: str = Header(...), x_user_groups: str = Header("")) 
 
 
 async def admission() -> AsyncIterator[None]:
-    if inflight.locked():
-        raise HTTPException(status_code=429, detail="Antara is at capacity", headers={"Retry-After": "5"})
-    async with inflight:
+    async for _ in inflight.hold():
         yield
+
+
+async def admit_ingest(client: Client = Depends(temporal)) -> None:
+    await ingest_gate.admit(client)
+
+
+async def admit_agent(client: Client = Depends(temporal)) -> None:
+    await agent_gate.admit(client)
 
 
 @app.get("/healthz")
@@ -66,7 +74,7 @@ async def healthz() -> dict[str, bool]:
     return {"ok": True}
 
 
-@app.post("/documents", status_code=202, dependencies=[Depends(admission)])
+@app.post("/documents", status_code=202, dependencies=[Depends(admission), Depends(admit_ingest)])
 async def upload_document(
     file: UploadFile,
     groups: str = Form("employees"),
@@ -142,7 +150,7 @@ async def delete_document(document_id: str, client: Client = Depends(temporal)) 
     return {"document_id": document_id, "workflow_id": workflow_id}
 
 
-@app.post("/agent/runs", status_code=202, dependencies=[Depends(admission)])
+@app.post("/agent/runs", status_code=202, dependencies=[Depends(admission), Depends(admit_agent)])
 async def start_run(
     body: AskRequest, user: UserContext = Depends(current_user), client: Client = Depends(temporal)
 ) -> dict[str, str]:
