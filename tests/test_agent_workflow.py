@@ -11,6 +11,9 @@ from common.models import (
     AgentRunState,
     ApprovalDecision,
     ApprovalOpenRequest,
+    CachedAnswer,
+    CacheLookupRequest,
+    CacheStoreRequest,
     ChunkResult,
     GenerateRequest,
     IncidentReport,
@@ -31,6 +34,18 @@ escalations: list[str] = []
 
 
 incident_reports: list[str] = []
+cache: dict[str, CachedAnswer] = {}
+retrievals: list[str] = []
+
+
+@activity.defn(name=Activities.CACHE_LOOKUP)
+async def fake_cache_lookup(request: CacheLookupRequest) -> CachedAnswer | None:
+    return cache.get(request.question.lower())
+
+
+@activity.defn(name=Activities.CACHE_STORE)
+async def fake_cache_store(request: CacheStoreRequest) -> None:
+    cache[request.question.lower()] = CachedAnswer(request.answer, request.citations)
 
 
 @activity.defn(name=Activities.CLASSIFY)
@@ -48,6 +63,7 @@ async def fake_report_incident(report: IncidentReport) -> IncidentResult:
 
 @activity.defn(name=Activities.RETRIEVE)
 async def fake_retrieve(request: RetrieveRequest) -> list[ChunkResult]:
+    retrievals.append(request.query)
     return [ChunkResult("doc-1", "ver-1", "chunk-1", "Prod database access needs manager approval.", 1, 0.91)]
 
 
@@ -92,7 +108,7 @@ def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
             env.client,
             task_queue=AGENT,
             workflows=[AgentRunWorkflow],
-            activities=[fake_classify, fake_retrieve, fake_generate],
+            activities=[fake_classify, fake_cache_lookup, fake_retrieve, fake_generate, fake_cache_store],
         ),
         Worker(
             env.client,
@@ -159,3 +175,18 @@ async def test_incident_reports_go_to_dedup_child_workflow_not_rag() -> None:
     assert second.incident.created is False
     assert second.incident.reporter_count == 2
     assert incident_reports == ["agent-vpn-1", "agent-vpn-2"]
+
+
+async def test_repeated_question_is_served_from_cache() -> None:
+    cache.clear()
+    retrievals.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            first = await (await _run(env, "agent-cache-1", "How do I reset my password?")).result()
+            second = await (await _run(env, "agent-cache-2", "How do I reset my password?")).result()
+    assert first.cached is False
+    assert second.cached is True
+    assert second.answer == first.answer
+    assert second.citations[0].chunk_id == "chunk-1"
+    assert retrievals == ["How do I reset my password?"]

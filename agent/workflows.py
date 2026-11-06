@@ -9,6 +9,9 @@ with workflow.unsafe.imports_passed_through():
         AgentRunState,
         ApprovalDecision,
         ApprovalOpenRequest,
+        CachedAnswer,
+        CacheLookupRequest,
+        CacheStoreRequest,
         ChunkResult,
         GenerateRequest,
         IncidentReport,
@@ -47,6 +50,21 @@ class AgentRunWorkflow:
         )
         if self._state.intent == Intent.INCIDENT:
             return await self._report_incident(request)
+        if self._state.intent == Intent.QUESTION:
+            cached = await workflow.execute_activity(
+                Activities.CACHE_LOOKUP,
+                CacheLookupRequest(question=request.question, user=request.user),
+                result_type=CachedAnswer | None,
+                task_queue=AGENT,
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=DEFAULT_RETRY,
+            )
+            if cached is not None:
+                self._state.answer = cached.answer
+                self._state.citations = cached.citations
+                self._state.cached = True
+                self._state.status = RunStatus.COMPLETED
+                return self._state
         chunks = await workflow.execute_activity(
             Activities.RETRIEVE,
             RetrieveRequest(query=request.question, user=request.user),
@@ -69,6 +87,16 @@ class AgentRunWorkflow:
             if turn.tool_call is None:
                 self._state.answer = turn.answer
                 self._state.status = RunStatus.COMPLETED
+                if self._state.intent == Intent.QUESTION and chunks and not tool_results and turn.answer:
+                    await workflow.execute_activity(
+                        Activities.CACHE_STORE,
+                        CacheStoreRequest(
+                            question=request.question, user=request.user, answer=turn.answer, citations=chunks
+                        ),
+                        task_queue=AGENT,
+                        start_to_close_timeout=timedelta(seconds=30),
+                        retry_policy=DEFAULT_RETRY,
+                    )
                 return self._state
             if turn.tool_call.requires_approval and not await self._await_approval(request, turn.tool_call, step):
                 self._state.status = RunStatus.DENIED

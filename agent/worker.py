@@ -4,6 +4,7 @@ from temporalio.worker import Worker
 
 from agent.activities import execute_tool, generate_answer, retrieve_documents
 from agent.approvals import escalate_approval, open_approval
+from agent.cache import lookup_cached_answer, store_cached_answer
 from agent.incidents import report_incident
 from agent.triage import classify_request
 from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
@@ -27,7 +28,13 @@ async def main() -> None:
             client,
             task_queue=AGENT,
             workflows=[AgentRunWorkflow],
-            activities=[classify_request, retrieve_documents, generate_answer],
+            activities=[
+                classify_request,
+                lookup_cached_answer,
+                retrieve_documents,
+                generate_answer,
+                store_cached_answer,
+            ],
             max_concurrent_activities=settings.max_concurrent_activities,
         )
     await worker.run()
