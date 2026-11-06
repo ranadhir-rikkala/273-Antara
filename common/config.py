@@ -31,6 +31,11 @@ class Settings(BaseSettings):
 
     max_inflight_requests: int = 64
 
+    auth_mode: str = "headers"
+    oidc_issuer: str = ""
+    oidc_jwks_url: str = ""
+    oidc_client_id: str = "antara-web"
+
     service_name: str = "antara"
     otel_endpoint: str = ""
     temporal_metrics_port: int = 0

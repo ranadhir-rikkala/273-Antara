@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from temporalio.client import Client
 
 from api.admission import BacklogGate, InflightLimit
+from api.auth import current_user
 from common import storage
 from common.config import settings
 from common.db import pool
@@ -58,10 +59,6 @@ def temporal() -> Client:
     return app_state.temporal
 
 
-def current_user(x_user_id: str = Header(...), x_user_groups: str = Header("")) -> UserContext:
-    return UserContext(user_id=x_user_id, groups=[g.strip() for g in x_user_groups.split(",") if g.strip()])
-
-
 async def admission() -> AsyncIterator[None]:
     async for _ in inflight.hold():
         yield
@@ -81,6 +78,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/auth/config")
+async def auth_config() -> dict[str, str]:
+    return {"mode": settings.auth_mode, "issuer": settings.oidc_issuer, "client_id": settings.oidc_client_id}
 
 
 @app.get("/healthz")
