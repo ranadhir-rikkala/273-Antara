@@ -56,7 +56,11 @@
     <h1>Antara Helpdesk</h1>
     <small>Private IT and security assistant. Nothing leaves the network.</small>
   </div>
-  <div class="row">
+  <div class="row" id="account" hidden>
+    <span id="signed-in"></span>
+    <button id="logout" class="secondary" type="button">Sign out</button>
+  </div>
+  <div class="row" id="picker">
     <label for="who">Signed in as</label>
     <select id="who" style="width:auto">
       <option value="alice|employees">alice (employee)</option>
@@ -103,18 +107,104 @@
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(["COMPLETED", "DENIED", "FAILED"]);
 
+const auth = { mode: "headers", issuer: "", clientId: "", token: null, refresh: null, claims: null };
+
+function decodeClaims(token) {
+  const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(decodeURIComponent(escape(atob(payload))));
+}
+
+function base64url(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function redirectUri() {
+  return `${location.origin}/`;
+}
+
+function keepTokens(body) {
+  auth.token = body.access_token;
+  auth.refresh = body.refresh_token;
+  auth.claims = decodeClaims(body.access_token);
+  sessionStorage.setItem("antara.tokens", JSON.stringify({ access_token: auth.token, refresh_token: auth.refresh }));
+}
+
+async function tokenRequest(params) {
+  const response = await fetch(`${auth.issuer}/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: auth.clientId, ...params }),
+  });
+  if (!response.ok) throw new Error("Sign-in failed");
+  keepTokens(await response.json());
+}
+
+async function login() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = base64url(crypto.getRandomValues(new Uint8Array(16)));
+  sessionStorage.setItem("antara.pkce", JSON.stringify({ verifier, state }));
+  const query = new URLSearchParams({
+    client_id: auth.clientId, response_type: "code", scope: "openid", redirect_uri: redirectUri(),
+    code_challenge: challenge, code_challenge_method: "S256", state,
+  });
+  location.assign(`${auth.issuer}/protocol/openid-connect/auth?${query}`);
+}
+
+function logout() {
+  sessionStorage.removeItem("antara.tokens");
+  const query = new URLSearchParams({ client_id: auth.clientId, post_logout_redirect_uri: redirectUri() });
+  location.assign(`${auth.issuer}/protocol/openid-connect/logout?${query}`);
+}
+
+async function startAuth() {
+  const config = await (await fetch("/auth/config")).json();
+  auth.mode = config.mode;
+  auth.issuer = config.issuer;
+  auth.clientId = config.client_id;
+  if (auth.mode !== "oidc") return;
+  $("picker").hidden = true;
+  const params = new URLSearchParams(location.search);
+  const pkce = JSON.parse(sessionStorage.getItem("antara.pkce") || "null");
+  if (params.get("code") && pkce && params.get("state") === pkce.state) {
+    await tokenRequest({ grant_type: "authorization_code", code: params.get("code"), redirect_uri: redirectUri(), code_verifier: pkce.verifier });
+    sessionStorage.removeItem("antara.pkce");
+    history.replaceState(null, "", "/");
+  } else {
+    const saved = JSON.parse(sessionStorage.getItem("antara.tokens") || "null");
+    if (!saved) { await login(); return; }
+    keepTokens(saved);
+  }
+  $("account").hidden = false;
+  $("signed-in").textContent = `${auth.claims.preferred_username} · ${(auth.claims.groups || []).join(", ")}`;
+  $("logout").addEventListener("click", logout);
+}
+
+async function freshToken() {
+  if (auth.claims && auth.claims.exp * 1000 - Date.now() < 30000) {
+    try { await tokenRequest({ grant_type: "refresh_token", refresh_token: auth.refresh }); }
+    catch (_) { await login(); }
+  }
+  return auth.token;
+}
+
 function identity() {
+  if (auth.mode === "oidc") {
+    return { user: auth.claims?.preferred_username || "", groups: (auth.claims?.groups || []).join(",") };
+  }
   const [user, groups] = $("who").value.split("|");
   return { user, groups };
 }
 
-function headers(extra = {}) {
+async function headers(extra = {}) {
+  if (auth.mode === "oidc") return { Authorization: `Bearer ${await freshToken()}`, ...extra };
   const { user, groups } = identity();
   return { "X-User-Id": user, "X-User-Groups": groups, ...extra };
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: headers(options.headers) });
+  const response = await fetch(path, { ...options, headers: await headers(options.headers) });
+  if (response.status === 401 && auth.mode === "oidc") { await login(); throw new Error("Signing in again"); }
   if (!response.ok) {
     const retry = response.headers.get("Retry-After");
     let detail = response.statusText;
@@ -256,9 +346,12 @@ async function loadInbox() {
 }
 
 $("who").addEventListener("change", () => { loadDocs(); loadInbox(); });
-loadDocs();
-loadInbox();
-setInterval(() => { loadDocs(); loadInbox(); }, 5000);
+startAuth().then(() => {
+  if (auth.mode === "oidc" && !auth.token) return;
+  loadDocs();
+  loadInbox();
+  setInterval(() => { loadDocs(); loadInbox(); }, 5000);
+});
 </script>
 </body>
 </html>
