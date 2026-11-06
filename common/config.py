@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     llm_model: str = "qwen2.5:7b-instruct"
     embedding_model: str = "nomic-embed-text"
     embedding_dim: int = 768
+    embedding_base_url: str = ""
 
     llm_upstream_url: str = "http://localhost:11434/v1"
+    embed_upstream_url: str = ""
     gateway_max_inflight_chat: int = 4
     gateway_max_inflight_embed: int = 8
     gateway_wait_seconds: float = 2.0
