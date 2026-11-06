@@ -119,6 +119,36 @@ async def upload_document(
     return {"document_id": document_id, "version_id": version_id, "workflow_id": workflow_id}
 
 
+@app.get("/documents")
+async def list_documents(user: UserContext = Depends(current_user)) -> list[dict[str, object]]:
+    db = await pool()
+    async with db.connection() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT d.document_id::text, d.title, v.status, v.version_number, d.created_at, "
+                "array(SELECT group_name FROM document_acl a WHERE a.document_id = d.document_id ORDER BY 1) "
+                "FROM documents d "
+                "JOIN LATERAL (SELECT status, version_number FROM document_versions "
+                "WHERE document_id = d.document_id ORDER BY version_number DESC LIMIT 1) v ON true "
+                "WHERE d.deleted_at IS NULL AND EXISTS ("
+                "SELECT 1 FROM document_acl a WHERE a.document_id = d.document_id AND a.group_name = ANY(%s)) "
+                "ORDER BY d.created_at DESC LIMIT 200",
+                (user.groups,),
+            )
+        ).fetchall()
+    return [
+        {
+            "document_id": row[0],
+            "title": row[1],
+            "status": row[2],
+            "version_number": row[3],
+            "created_at": row[4].isoformat(),
+            "groups": row[5],
+        }
+        for row in rows
+    ]
+
+
 @app.get("/documents/{document_id}")
 async def get_document(document_id: str) -> dict[str, object]:
     db = await pool()
