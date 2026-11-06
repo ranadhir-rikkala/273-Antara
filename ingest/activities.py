@@ -188,6 +188,11 @@ async def purge_document(document_id: str) -> int:
         await conn.execute(
             "UPDATE documents SET active_version_id = NULL, deleted_at = now() WHERE document_id = %s", (document_id,)
         )
+        await conn.execute(
+            "DELETE FROM answer_cache WHERE version_ids && "
+            "(SELECT coalesce(array_agg(version_id), '{}') FROM document_versions WHERE document_id = %s)",
+            (document_id,),
+        )
         await conn.execute("DELETE FROM document_chunks WHERE document_id = %s", (document_id,))
         await conn.execute(
             "UPDATE document_versions SET status = %s, updated_at = now() WHERE document_id = %s",
