@@ -4,9 +4,19 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
+from prometheus_client import Counter, Gauge, Histogram, make_asgi_app
 from pydantic import BaseModel
 
 from common.config import settings
+
+INFLIGHT = Gauge("antara_gateway_inflight", "Model calls in flight", ["kind"])
+REJECTED = Counter("antara_gateway_rejected_total", "Model calls refused by the gateway", ["kind", "reason"])
+LATENCY = Histogram(
+    "antara_gateway_upstream_seconds",
+    "Upstream model latency",
+    ["kind"],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120),
+)
 
 
 class ChaosRequest(BaseModel):
@@ -31,6 +41,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Antara model gateway", lifespan=lifespan)
+app.mount("/metrics", make_asgi_app())
 
 
 @app.get("/healthz")
@@ -46,25 +57,30 @@ async def chaos(request: ChaosRequest) -> dict[str, float]:
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request) -> Response:
-    return await _forward(request, "/chat/completions", state.chat_slots)
+    return await _forward(request, "/chat/completions", state.chat_slots, "chat")
 
 
 @app.post("/v1/embeddings")
 async def embeddings(request: Request) -> Response:
-    return await _forward(request, "/embeddings", state.embed_slots)
+    return await _forward(request, "/embeddings", state.embed_slots, "embed")
 
 
-async def _forward(request: Request, path: str, slots: asyncio.Semaphore) -> Response:
+async def _forward(request: Request, path: str, slots: asyncio.Semaphore, kind: str) -> Response:
     if time.monotonic() < state.chaos_until:
+        REJECTED.labels(kind, "chaos").inc()
         raise HTTPException(status_code=503, detail="Model unavailable (chaos flag)")
     try:
         await asyncio.wait_for(slots.acquire(), timeout=settings.gateway_wait_seconds)
     except TimeoutError:
+        REJECTED.labels(kind, "busy").inc()
         raise HTTPException(status_code=429, detail="Model busy", headers={"Retry-After": "2"}) from None
+    INFLIGHT.labels(kind).inc()
     try:
-        upstream = await state.upstream.post(
-            path, content=await request.body(), headers={"content-type": "application/json"}
-        )
+        with LATENCY.labels(kind).time():
+            upstream = await state.upstream.post(
+                path, content=await request.body(), headers={"content-type": "application/json"}
+            )
     finally:
+        INFLIGHT.labels(kind).dec()
         slots.release()
     return Response(content=upstream.content, status_code=upstream.status_code, media_type="application/json")
