@@ -4,12 +4,16 @@ import time
 from collections.abc import AsyncIterator
 
 from fastapi import HTTPException
+from prometheus_client import Counter, Gauge
 from temporalio.client import Client
 from temporalio.service import RPCError
 
 from common.queue_stats import queue_stats
 
 MAX_RETRY_AFTER_SECONDS = 30
+
+REJECTED = Counter("antara_api_rejected_total", "Requests rejected with HTTP 429", ["reason"])
+QUEUE_BACKLOG = Gauge("antara_queue_backlog", "Last observed activity backlog per task queue", ["queue"])
 
 
 def retry_after_seconds(backlog: int, limit: int) -> int:
@@ -33,6 +37,7 @@ class BacklogGate:
             if time.monotonic() - self._checked_at >= self.refresh_seconds:
                 with contextlib.suppress(RPCError):
                     self.backlog = (await queue_stats(client, self.queue)).backlog
+                    QUEUE_BACKLOG.labels(self.queue).set(self.backlog)
                 self._checked_at = time.monotonic()
         return self.backlog
 
@@ -40,6 +45,7 @@ class BacklogGate:
         backlog = await self.current_backlog(client)
         if backlog > self.limit:
             self.rejected += 1
+            REJECTED.labels(f"backlog:{self.queue}").inc()
             raise HTTPException(
                 status_code=429,
                 detail=f"Queue {self.queue} has {backlog} waiting tasks; try again shortly",
@@ -56,6 +62,7 @@ class InflightLimit:
     async def hold(self) -> AsyncIterator[None]:
         if self._slots.locked():
             self.rejected += 1
+            REJECTED.labels("inflight").inc()
             raise HTTPException(status_code=429, detail="Antara is at capacity", headers={"Retry-After": "5"})
         async with self._slots:
             yield
