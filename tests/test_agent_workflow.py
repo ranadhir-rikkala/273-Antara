@@ -9,6 +9,7 @@ from common.models import (
     AgentRunRequest,
     AgentRunState,
     ApprovalDecision,
+    ApprovalOpenRequest,
     ChunkResult,
     GenerateRequest,
     ModelTurn,
@@ -23,6 +24,7 @@ from common.names import Activities, Queries, Signals, Workflows
 from common.queues import AGENT, TOOLS
 
 executed: list[str] = []
+escalations: list[str] = []
 
 
 @activity.defn(name=Activities.RETRIEVE)
@@ -45,6 +47,16 @@ async def fake_execute_tool(request: ToolRequest) -> ToolResult:
     return ToolResult(request.idempotency_key, "COMPLETED", {"approval_id": "approval-1"})
 
 
+@activity.defn(name=Activities.OPEN_APPROVAL)
+async def fake_open_approval(request: ApprovalOpenRequest) -> str:
+    return f"approval-for-{request.approval_key}"
+
+
+@activity.defn(name=Activities.ESCALATE_APPROVAL)
+async def fake_escalate_approval(approval_id: str) -> None:
+    escalations.append(approval_id)
+
+
 async def _run(env: WorkflowEnvironment, workflow_id: str, question: str):
     return await env.client.start_workflow(
         Workflows.AGENT_RUN,
@@ -58,7 +70,11 @@ async def _run(env: WorkflowEnvironment, workflow_id: str, question: str):
 def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
     return (
         Worker(env.client, task_queue=AGENT, workflows=[AgentRunWorkflow], activities=[fake_retrieve, fake_generate]),
-        Worker(env.client, task_queue=TOOLS, activities=[fake_execute_tool]),
+        Worker(
+            env.client,
+            task_queue=TOOLS,
+            activities=[fake_execute_tool, fake_open_approval, fake_escalate_approval],
+        ),
     )
 
 
@@ -75,6 +91,7 @@ async def test_answers_with_citations_without_tools() -> None:
 
 async def test_access_request_escalates_then_runs_tool_once_after_approval() -> None:
     executed.clear()
+    escalations.clear()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         agent_worker, tools_worker = _workers(env)
         async with agent_worker, tools_worker:
@@ -82,6 +99,8 @@ async def test_access_request_escalates_then_runs_tool_once_after_approval() -> 
             await env.sleep(timedelta(minutes=3))
             waiting = await handle.query(Queries.STATE, result_type=AgentRunState)
             assert waiting.status == RunStatus.ESCALATED
+            assert waiting.approval_id == "approval-for-agent-approve:0"
+            assert escalations == ["approval-for-agent-approve:0"]
             assert executed == []
             await handle.signal(Signals.APPROVAL, ApprovalDecision(approved=True, approver_id="manager-1"))
             result = await handle.result()

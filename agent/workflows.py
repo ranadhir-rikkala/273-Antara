@@ -8,11 +8,13 @@ with workflow.unsafe.imports_passed_through():
         AgentRunRequest,
         AgentRunState,
         ApprovalDecision,
+        ApprovalOpenRequest,
         ChunkResult,
         GenerateRequest,
         ModelTurn,
         RetrieveRequest,
         RunStatus,
+        ToolCall,
         ToolRequest,
         ToolResult,
     )
@@ -55,7 +57,7 @@ class AgentRunWorkflow:
                 self._state.answer = turn.answer
                 self._state.status = RunStatus.COMPLETED
                 return self._state
-            if turn.tool_call.requires_approval and not await self._await_approval():
+            if turn.tool_call.requires_approval and not await self._await_approval(request, turn.tool_call, step):
                 self._state.status = RunStatus.DENIED
                 return self._state
             self._state.status = RunStatus.RUNNING
@@ -65,6 +67,7 @@ class AgentRunWorkflow:
                     idempotency_key=f"{workflow.info().workflow_id}:{step}",
                     call=turn.tool_call,
                     user=request.user,
+                    run_id=workflow.info().workflow_id,
                 ),
                 result_type=ToolResult,
                 task_queue=TOOLS,
@@ -76,13 +79,29 @@ class AgentRunWorkflow:
         self._state.status = RunStatus.FAILED
         return self._state
 
-    async def _await_approval(self) -> bool:
+    async def _await_approval(self, request: AgentRunRequest, call: ToolCall, step: int) -> bool:
+        run_id = workflow.info().workflow_id
+        self._state.approval_id = await workflow.execute_activity(
+            Activities.OPEN_APPROVAL,
+            ApprovalOpenRequest(approval_key=f"{run_id}:{step}", run_id=run_id, user=request.user, call=call),
+            result_type=str,
+            task_queue=TOOLS,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=DEFAULT_RETRY,
+        )
         self._state.status = RunStatus.WAITING_APPROVAL
         try:
             await workflow.wait_condition(lambda: self._decision is not None, timeout=ESCALATE_AFTER)
         except TimeoutError:
             self._state.escalated = True
             self._state.status = RunStatus.ESCALATED
+            await workflow.execute_activity(
+                Activities.ESCALATE_APPROVAL,
+                self._state.approval_id,
+                task_queue=TOOLS,
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=DEFAULT_RETRY,
+            )
             await workflow.wait_condition(lambda: self._decision is not None)
         approved = self._decision.approved
         self._decision = None

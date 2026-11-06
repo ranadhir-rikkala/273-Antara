@@ -44,12 +44,15 @@ async def _request_access(conn: AsyncConnection, request: ToolRequest) -> dict[s
     args = request.call.arguments
     row = await (
         await conn.execute(
-            "INSERT INTO approvals (requester_id, system, role, reason, status) VALUES (%s, %s, %s, %s, 'APPROVED') "
-            "RETURNING approval_id::text",
-            (request.user.user_id, args["system"], args["role"], args.get("reason", "")),
+            "INSERT INTO access_grants (run_id, requester_id, system, role) VALUES (%s, %s, %s, %s) "
+            "RETURNING grant_id::text",
+            (request.run_id, request.user.user_id, args["system"], args["role"]),
         )
     ).fetchone()
-    return {"approval_id": row[0], "system": args["system"], "role": args["role"], "status": "APPROVED"}
+    await conn.execute(
+        "UPDATE approvals SET status = 'GRANTED' WHERE run_id = %s AND status = 'APPROVED'", (request.run_id,)
+    )
+    return {"grant_id": row[0], "system": args["system"], "role": args["role"], "status": "GRANTED"}
 
 
 Handler = Callable[[AsyncConnection, ToolRequest], Awaitable[dict[str, Any]]]

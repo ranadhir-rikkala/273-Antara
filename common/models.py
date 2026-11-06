@@ -109,6 +109,7 @@ class ToolRequest:
     idempotency_key: str
     call: ToolCall
     user: UserContext
+    run_id: str = ""
 
 
 @dataclass
@@ -132,12 +133,21 @@ class ApprovalDecision:
 
 
 @dataclass
+class ApprovalOpenRequest:
+    approval_key: str
+    run_id: str
+    user: UserContext
+    call: ToolCall
+
+
+@dataclass
 class AgentRunState:
     status: str
     answer: str | None = None
     citations: list[ChunkResult] = field(default_factory=list)
     tool_results: list[ToolResult] = field(default_factory=list)
     escalated: bool = False
+    approval_id: str | None = None
 
 
 @dataclass

@@ -16,6 +16,8 @@ class Activities:
     RETRIEVE = "retrieve_documents"
     GENERATE = "generate_answer"
     EXECUTE_TOOL = "execute_tool"
+    OPEN_APPROVAL = "open_approval"
+    ESCALATE_APPROVAL = "escalate_approval"
     FIND_INCONSISTENT = "find_inconsistent_versions"
 
 

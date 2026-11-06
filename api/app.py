@@ -168,15 +168,64 @@ async def get_run(run_id: str, client: Client = Depends(temporal)) -> dict[str, 
     return {"run_id": run_id, **asdict(state)}
 
 
-@app.post("/agent/runs/{run_id}/approval", status_code=202)
+APPROVER_GROUP = "managers"
+ESCALATION_GROUP = "security-leads"
+
+
+@app.get("/approvals")
+async def list_approvals(user: UserContext = Depends(current_user)) -> list[dict[str, object]]:
+    if APPROVER_GROUP not in user.groups and ESCALATION_GROUP not in user.groups:
+        raise HTTPException(status_code=403, detail="Only approvers can see the approvals inbox")
+    escalated_only = APPROVER_GROUP not in user.groups
+    db = await pool()
+    async with db.connection() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT approval_id::text, run_id, requester_id, system, role, reason, escalated, created_at "
+                "FROM approvals WHERE status = 'PENDING' AND (escalated OR NOT %s) ORDER BY created_at",
+                (escalated_only,),
+            )
+        ).fetchall()
+    return [
+        {
+            "approval_id": row[0],
+            "run_id": row[1],
+            "requester_id": row[2],
+            "system": row[3],
+            "role": row[4],
+            "reason": row[5],
+            "escalated": row[6],
+            "created_at": row[7].isoformat(),
+        }
+        for row in rows
+    ]
+
+
+@app.post("/approvals/{approval_id}/decision", status_code=202)
 async def decide(
-    run_id: str,
+    approval_id: str,
     body: ApprovalRequest,
     user: UserContext = Depends(current_user),
     client: Client = Depends(temporal),
 ) -> dict[str, str]:
-    if "managers" not in user.groups:
-        raise HTTPException(status_code=403, detail="Only managers can approve access requests")
+    db = await pool()
+    async with db.connection() as conn, conn.transaction():
+        row = await (
+            await conn.execute(
+                "SELECT run_id, status, escalated FROM approvals WHERE approval_id = %s FOR UPDATE", (approval_id,)
+            )
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Approval not found")
+        run_id, status, escalated = row
+        if status != "PENDING":
+            raise HTTPException(status_code=409, detail=f"Approval is already {status}")
+        if APPROVER_GROUP not in user.groups and not (escalated and ESCALATION_GROUP in user.groups):
+            raise HTTPException(status_code=403, detail="You cannot decide this approval")
+        await conn.execute(
+            "UPDATE approvals SET status = %s, decided_by = %s, decided_at = now() WHERE approval_id = %s",
+            ("APPROVED" if body.approved else "DENIED", user.user_id, approval_id),
+        )
     decision = ApprovalDecision(approved=body.approved, approver_id=user.user_id, comment=body.comment)
     await client.get_workflow_handle(run_id).signal(Signals.APPROVAL, decision)
-    return {"run_id": run_id, "decision": "approved" if body.approved else "denied"}
+    return {"approval_id": approval_id, "run_id": run_id, "decision": "approved" if body.approved else "denied"}

@@ -3,6 +3,7 @@ import asyncio
 from temporalio.worker import Worker
 
 from agent.activities import execute_tool, generate_answer, retrieve_documents
+from agent.approvals import escalate_approval, open_approval
 from agent.workflows import AgentRunWorkflow
 from common.config import settings
 from common.queues import AGENT, TOOLS
@@ -15,7 +16,7 @@ async def main() -> None:
         worker = Worker(
             client,
             task_queue=TOOLS,
-            activities=[execute_tool],
+            activities=[execute_tool, open_approval, escalate_approval],
             max_concurrent_activities=settings.max_concurrent_activities,
         )
     else:
