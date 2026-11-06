@@ -31,6 +31,9 @@ class GatewayState:
         self.embed_slots = asyncio.Semaphore(settings.gateway_max_inflight_embed)
         self.chaos_until = 0.0
         self.upstream = httpx.AsyncClient(base_url=settings.llm_upstream_url, timeout=300.0)
+        self.embed_upstream = httpx.AsyncClient(
+            base_url=settings.embed_upstream_url or settings.llm_upstream_url, timeout=300.0
+        )
 
 
 state = GatewayState()
@@ -41,6 +44,7 @@ async def lifespan(_: FastAPI):
     setup_tracing()
     yield
     await state.upstream.aclose()
+    await state.embed_upstream.aclose()
 
 
 app = FastAPI(title="Antara model gateway", lifespan=lifespan)
@@ -61,15 +65,17 @@ async def chaos(request: ChaosRequest) -> dict[str, float]:
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request) -> Response:
-    return await _forward(request, "/chat/completions", state.chat_slots, "chat")
+    return await _forward(request, "/chat/completions", state.chat_slots, "chat", state.upstream)
 
 
 @app.post("/v1/embeddings")
 async def embeddings(request: Request) -> Response:
-    return await _forward(request, "/embeddings", state.embed_slots, "embed")
+    return await _forward(request, "/embeddings", state.embed_slots, "embed", state.embed_upstream)
 
 
-async def _forward(request: Request, path: str, slots: asyncio.Semaphore, kind: str) -> Response:
+async def _forward(
+    request: Request, path: str, slots: asyncio.Semaphore, kind: str, upstream_client: httpx.AsyncClient
+) -> Response:
     if time.monotonic() < state.chaos_until:
         REJECTED.labels(kind, "chaos").inc()
         raise HTTPException(status_code=503, detail="Model unavailable (chaos flag)")
@@ -81,7 +87,7 @@ async def _forward(request: Request, path: str, slots: asyncio.Semaphore, kind: 
     INFLIGHT.labels(kind).inc()
     try:
         with LATENCY.labels(kind).time():
-            upstream = await state.upstream.post(
+            upstream = await upstream_client.post(
                 path, content=await request.body(), headers={"content-type": "application/json"}
             )
     finally:
