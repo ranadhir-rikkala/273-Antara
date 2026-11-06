@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "antara",
+      "credentials": [{ "accessKey": "antara", "secretKey": "antara-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

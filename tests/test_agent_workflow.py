@@ -1,0 +1,102 @@
+from datetime import timedelta
+
+from temporalio import activity
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+from agent.workflows import AgentRunWorkflow
+from common.models import (
+    AgentRunRequest,
+    AgentRunState,
+    ApprovalDecision,
+    ChunkResult,
+    GenerateRequest,
+    ModelTurn,
+    RetrieveRequest,
+    RunStatus,
+    ToolCall,
+    ToolRequest,
+    ToolResult,
+    UserContext,
+)
+from common.names import Activities, Queries, Signals, Workflows
+from common.queues import AGENT, TOOLS
+
+executed: list[str] = []
+
+
+@activity.defn(name=Activities.RETRIEVE)
+async def fake_retrieve(request: RetrieveRequest) -> list[ChunkResult]:
+    return [ChunkResult("doc-1", "ver-1", "chunk-1", "Prod database access needs manager approval.", 1, 0.91)]
+
+
+@activity.defn(name=Activities.GENERATE)
+async def fake_generate(request: GenerateRequest) -> ModelTurn:
+    if "access" in request.question and not request.tool_results:
+        return ModelTurn(
+            tool_call=ToolCall("request_access", {"system": "prod-db", "role": "read"}, requires_approval=True)
+        )
+    return ModelTurn(answer="Done [1]")
+
+
+@activity.defn(name=Activities.EXECUTE_TOOL)
+async def fake_execute_tool(request: ToolRequest) -> ToolResult:
+    executed.append(request.idempotency_key)
+    return ToolResult(request.idempotency_key, "COMPLETED", {"approval_id": "approval-1"})
+
+
+async def _run(env: WorkflowEnvironment, workflow_id: str, question: str):
+    return await env.client.start_workflow(
+        Workflows.AGENT_RUN,
+        AgentRunRequest(question=question, user=UserContext("alice", ["employees"])),
+        id=workflow_id,
+        task_queue=AGENT,
+        result_type=AgentRunState,
+    )
+
+
+def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
+    return (
+        Worker(env.client, task_queue=AGENT, workflows=[AgentRunWorkflow], activities=[fake_retrieve, fake_generate]),
+        Worker(env.client, task_queue=TOOLS, activities=[fake_execute_tool]),
+    )
+
+
+async def test_answers_with_citations_without_tools() -> None:
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            handle = await _run(env, "agent-answer", "How do I reset my password?")
+            result = await handle.result()
+    assert result.status == RunStatus.COMPLETED
+    assert result.answer == "Done [1]"
+    assert result.citations[0].chunk_id == "chunk-1"
+
+
+async def test_access_request_escalates_then_runs_tool_once_after_approval() -> None:
+    executed.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            handle = await _run(env, "agent-approve", "I need access to prod-db")
+            await env.sleep(timedelta(minutes=3))
+            waiting = await handle.query(Queries.STATE, result_type=AgentRunState)
+            assert waiting.status == RunStatus.ESCALATED
+            assert executed == []
+            await handle.signal(Signals.APPROVAL, ApprovalDecision(approved=True, approver_id="manager-1"))
+            result = await handle.result()
+    assert result.status == RunStatus.COMPLETED
+    assert result.escalated is True
+    assert executed == ["agent-approve:0"]
+
+
+async def test_denied_access_request_never_runs_tool() -> None:
+    executed.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            handle = await _run(env, "agent-deny", "I need access to prod-db")
+            await handle.signal(Signals.APPROVAL, ApprovalDecision(approved=False, approver_id="manager-1"))
+            result = await handle.result()
+    assert result.status == RunStatus.DENIED
+    assert executed == []

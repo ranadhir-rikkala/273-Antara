@@ -1,0 +1,114 @@
+name: antara
+
+x-app: &app
+  image: antara-app:dev
+  pull_policy: never
+  restart: unless-stopped
+  depends_on:
+    temporal:
+      condition: service_started
+    app-db:
+      condition: service_healthy
+    object-store:
+      condition: service_started
+  environment: &app-env
+    TEMPORAL_ADDRESS: temporal:7233
+    DATABASE_URL: postgresql://antara:antara@app-db:5432/antara
+    S3_ENDPOINT: object-store:8333
+    LLM_BASE_URL: http://gateway:8080/v1
+    LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
+    EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+
+services:
+  temporal:
+    image: temporalio/temporal:1.4.1
+    user: "0:0"
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-ip", "0.0.0.0", "--db-filename", "/data/temporal.db"]
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+    volumes:
+      - temporal-data:/data
+
+  app-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: antara
+      POSTGRES_PASSWORD: antara
+      POSTGRES_DB: antara
+    ports:
+      - "5433:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      - ../sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U antara -d antara"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  object-store:
+    image: chrislusf/seaweedfs:3.97
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
+    ports:
+      - "8333:8333"
+    volumes:
+      - object-store-data:/data
+      - ./seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+
+  gateway:
+    <<: *app
+    depends_on: []
+    command: ["uvicorn", "gateway.app:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      LLM_UPSTREAM_URL: ${LLM_UPSTREAM_URL:-http://host.docker.internal:11434/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8088:8080"
+
+  api:
+    <<: *app
+    build:
+      context: ../..
+    pull_policy: build
+    command: ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+
+  ingest-cpu:
+    <<: *app
+    command: ["python", "-m", "ingest.worker"]
+    environment:
+      <<: *app-env
+      WORKER_QUEUE: ingest-cpu
+
+  ingest-gpu:
+    <<: *app
+    command: ["python", "-m", "ingest.worker"]
+    environment:
+      <<: *app-env
+      WORKER_QUEUE: ingest-gpu
+
+  agent:
+    <<: *app
+    command: ["python", "-m", "agent.worker"]
+    environment:
+      <<: *app-env
+      WORKER_QUEUE: agent
+
+  tools:
+    <<: *app
+    command: ["python", "-m", "agent.worker"]
+    environment:
+      <<: *app-env
+      WORKER_QUEUE: tools
+
+  reconciler:
+    <<: *app
+    command: ["python", "-m", "reconciler.worker"]
+
+volumes:
+  temporal-data:
+  app-db-data:
+  object-store-data:

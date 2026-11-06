@@ -1,0 +1,5 @@
+INGEST_CPU = "ingest-cpu"
+INGEST_GPU = "ingest-gpu"
+AGENT = "agent"
+TOOLS = "tools"
+RECONCILER = "reconciler"
