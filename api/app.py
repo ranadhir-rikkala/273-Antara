@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 from temporalio.client import Client
@@ -37,6 +38,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Antara API", lifespan=lifespan)
 app.mount("/metrics", make_asgi_app())
+FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,metrics")
 
 
 class AskRequest(BaseModel):

@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import Counter, Gauge, Histogram, make_asgi_app
 from pydantic import BaseModel
 
 from common.config import settings
+from common.telemetry import setup_tracing
 
 INFLIGHT = Gauge("antara_gateway_inflight", "Model calls in flight", ["kind"])
 REJECTED = Counter("antara_gateway_rejected_total", "Model calls refused by the gateway", ["kind", "reason"])
@@ -36,12 +38,14 @@ state = GatewayState()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    setup_tracing()
     yield
     await state.upstream.aclose()
 
 
 app = FastAPI(title="Antara model gateway", lifespan=lifespan)
 app.mount("/metrics", make_asgi_app())
+FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,metrics")
 
 
 @app.get("/healthz")
