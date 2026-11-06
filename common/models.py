@@ -154,6 +154,26 @@ class IncidentResult:
 
 
 @dataclass
+class CacheLookupRequest:
+    question: str
+    user: UserContext
+
+
+@dataclass
+class CachedAnswer:
+    answer: str
+    citations: list[ChunkResult]
+
+
+@dataclass
+class CacheStoreRequest:
+    question: str
+    user: UserContext
+    answer: str
+    citations: list[ChunkResult]
+
+
+@dataclass
 class ApprovalOpenRequest:
     approval_key: str
     run_id: str
@@ -171,6 +191,7 @@ class AgentRunState:
     approval_id: str | None = None
     intent: str | None = None
     incident: IncidentResult | None = None
+    cached: bool = False
 
 
 @dataclass

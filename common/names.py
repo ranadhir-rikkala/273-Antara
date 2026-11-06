@@ -21,6 +21,8 @@ class Activities:
     ESCALATE_APPROVAL = "escalate_approval"
     CLASSIFY = "classify_request"
     REPORT_INCIDENT = "report_incident"
+    CACHE_LOOKUP = "lookup_cached_answer"
+    CACHE_STORE = "store_cached_answer"
     FIND_INCONSISTENT = "find_inconsistent_versions"
 
 
