@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     max_inflight_requests: int = 64
 
+    service_name: str = "antara"
+    otel_endpoint: str = ""
+    temporal_metrics_port: int = 0
+
     incident_similarity: float = 0.82
     incident_window_minutes: int = 60
 

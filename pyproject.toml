@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Antara Sovereign AI: private RAG pipeline and agentic helpdesk on Temporal"
 requires-python = ">=3.12"
 dependencies = [
-    "temporalio>=1.9",
+    "temporalio[opentelemetry]>=1.9",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "httpx>=0.27",
@@ -14,6 +14,11 @@ dependencies = [
     "minio>=7.2",
     "pypdf>=5.0",
     "python-multipart>=0.0.9",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-instrumentation-httpx>=0.48b0",
+    "prometheus-client>=0.21",
 ]
 
 [project.optional-dependencies]
