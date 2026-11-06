@@ -5,8 +5,10 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError
 
 from common import storage
+from common.config import settings
 from common.db import pool, vector_literal
 from common.llm import LLMProvider
 from common.models import (
@@ -19,7 +21,10 @@ from common.models import (
     VersionStatus,
 )
 from common.names import Activities, Errors
-from common.queues import INGEST_GPU
+from common.queue_stats import queue_stats
+from common.queues import INGEST_CPU, INGEST_GPU
+from common.temporal_client import shared
+from ingest.dispatch import choose_embed_queue
 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
@@ -97,7 +102,14 @@ async def chunk_document(document: ExtractedDocument) -> ChunkedDocument:
 
 @activity.defn(name=Activities.SELECT_EMBED_QUEUE)
 async def select_embed_queue() -> str:
-    return INGEST_GPU
+    try:
+        stats = await queue_stats(await shared(), INGEST_GPU)
+    except RPCError as error:
+        activity.logger.warning("Queue stats unavailable, embedding on CPU: %s", error)
+        return INGEST_CPU
+    queue, reason = choose_embed_queue(stats, settings.gpu_offload_backlog)
+    activity.logger.info("Embedding on %s: %s", queue, reason)
+    return queue
 
 
 @activity.defn(name=Activities.EMBED)

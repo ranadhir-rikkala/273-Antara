@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     worker_queue: str = "ingest-cpu"
     max_concurrent_activities: int = 8
     embed_batch_size: int = 32
+    gpu_offload_backlog: int = 64
 
     max_inflight_requests: int = 64
 
