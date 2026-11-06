@@ -3,6 +3,7 @@ class Workflows:
     AGENT_RUN = "AgentRunWorkflow"
     RECONCILER = "ReconcilerWorkflow"
     DELETE_DOCUMENT = "DeleteDocumentWorkflow"
+    INCIDENT_REPORT = "IncidentReportWorkflow"
 
 
 class Activities:
@@ -18,6 +19,8 @@ class Activities:
     EXECUTE_TOOL = "execute_tool"
     OPEN_APPROVAL = "open_approval"
     ESCALATE_APPROVAL = "escalate_approval"
+    CLASSIFY = "classify_request"
+    REPORT_INCIDENT = "report_incident"
     FIND_INCONSISTENT = "find_inconsistent_versions"
 
 

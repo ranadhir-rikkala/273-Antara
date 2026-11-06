@@ -4,7 +4,8 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from agent.workflows import AgentRunWorkflow
+from agent.triage import classify_by_rules
+from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
 from common.models import (
     AgentRunRequest,
     AgentRunState,
@@ -12,6 +13,8 @@ from common.models import (
     ApprovalOpenRequest,
     ChunkResult,
     GenerateRequest,
+    IncidentReport,
+    IncidentResult,
     ModelTurn,
     RetrieveRequest,
     RunStatus,
@@ -25,6 +28,22 @@ from common.queues import AGENT, TOOLS
 
 executed: list[str] = []
 escalations: list[str] = []
+
+
+incident_reports: list[str] = []
+
+
+@activity.defn(name=Activities.CLASSIFY)
+async def fake_classify(question: str) -> str:
+    return classify_by_rules(question)
+
+
+@activity.defn(name=Activities.REPORT_INCIDENT)
+async def fake_report_incident(report: IncidentReport) -> IncidentResult:
+    incident_reports.append(report.report_id)
+    return IncidentResult(
+        "incident-1", "VPN is down", created=len(incident_reports) == 1, reporter_count=len(incident_reports)
+    )
 
 
 @activity.defn(name=Activities.RETRIEVE)
@@ -69,11 +88,17 @@ async def _run(env: WorkflowEnvironment, workflow_id: str, question: str):
 
 def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
     return (
-        Worker(env.client, task_queue=AGENT, workflows=[AgentRunWorkflow], activities=[fake_retrieve, fake_generate]),
+        Worker(
+            env.client,
+            task_queue=AGENT,
+            workflows=[AgentRunWorkflow],
+            activities=[fake_classify, fake_retrieve, fake_generate],
+        ),
         Worker(
             env.client,
             task_queue=TOOLS,
-            activities=[fake_execute_tool, fake_open_approval, fake_escalate_approval],
+            workflows=[IncidentReportWorkflow],
+            activities=[fake_execute_tool, fake_open_approval, fake_escalate_approval, fake_report_incident],
         ),
     )
 
@@ -95,7 +120,7 @@ async def test_access_request_escalates_then_runs_tool_once_after_approval() -> 
     async with await WorkflowEnvironment.start_time_skipping() as env:
         agent_worker, tools_worker = _workers(env)
         async with agent_worker, tools_worker:
-            handle = await _run(env, "agent-approve", "I need access to prod-db")
+            handle = await _run(env, "agent-approve", "I need access to prod-db please")
             await env.sleep(timedelta(minutes=3))
             waiting = await handle.query(Queries.STATE, result_type=AgentRunState)
             assert waiting.status == RunStatus.ESCALATED
@@ -119,3 +144,18 @@ async def test_denied_access_request_never_runs_tool() -> None:
             result = await handle.result()
     assert result.status == RunStatus.DENIED
     assert executed == []
+
+
+async def test_incident_reports_go_to_dedup_child_workflow_not_rag() -> None:
+    incident_reports.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            first = await (await _run(env, "agent-vpn-1", "The VPN is down for me")).result()
+            second = await (await _run(env, "agent-vpn-2", "vpn not working since 9am")).result()
+    assert first.intent == "incident"
+    assert first.incident.created is True
+    assert first.citations == []
+    assert second.incident.created is False
+    assert second.incident.reporter_count == 2
+    assert incident_reports == ["agent-vpn-1", "agent-vpn-2"]

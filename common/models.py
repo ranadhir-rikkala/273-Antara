@@ -12,6 +12,12 @@ class VersionStatus(StrEnum):
     DELETED = "DELETED"
 
 
+class Intent(StrEnum):
+    QUESTION = "question"
+    ACTION = "action"
+    INCIDENT = "incident"
+
+
 class RunStatus(StrEnum):
     RUNNING = "RUNNING"
     WAITING_APPROVAL = "WAITING_APPROVAL"
@@ -133,6 +139,21 @@ class ApprovalDecision:
 
 
 @dataclass
+class IncidentReport:
+    report_id: str
+    reporter: UserContext
+    text: str
+
+
+@dataclass
+class IncidentResult:
+    incident_id: str
+    title: str
+    created: bool
+    reporter_count: int
+
+
+@dataclass
 class ApprovalOpenRequest:
     approval_key: str
     run_id: str
@@ -148,6 +169,8 @@ class AgentRunState:
     tool_results: list[ToolResult] = field(default_factory=list)
     escalated: bool = False
     approval_id: str | None = None
+    intent: str | None = None
+    incident: IncidentResult | None = None
 
 
 @dataclass

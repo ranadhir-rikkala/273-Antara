@@ -11,6 +11,9 @@ with workflow.unsafe.imports_passed_through():
         ApprovalOpenRequest,
         ChunkResult,
         GenerateRequest,
+        IncidentReport,
+        IncidentResult,
+        Intent,
         ModelTurn,
         RetrieveRequest,
         RunStatus,
@@ -34,6 +37,16 @@ class AgentRunWorkflow:
 
     @workflow.run
     async def run(self, request: AgentRunRequest) -> AgentRunState:
+        self._state.intent = await workflow.execute_activity(
+            Activities.CLASSIFY,
+            request.question,
+            result_type=str,
+            task_queue=AGENT,
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=DEFAULT_RETRY,
+        )
+        if self._state.intent == Intent.INCIDENT:
+            return await self._report_incident(request)
         chunks = await workflow.execute_activity(
             Activities.RETRIEVE,
             RetrieveRequest(query=request.question, user=request.user),
@@ -79,6 +92,26 @@ class AgentRunWorkflow:
         self._state.status = RunStatus.FAILED
         return self._state
 
+    async def _report_incident(self, request: AgentRunRequest) -> AgentRunState:
+        run_id = workflow.info().workflow_id
+        incident = await workflow.execute_child_workflow(
+            Workflows.INCIDENT_REPORT,
+            IncidentReport(report_id=run_id, reporter=request.user, text=request.question),
+            id=f"{run_id}-incident",
+            task_queue=TOOLS,
+            result_type=IncidentResult,
+        )
+        self._state.incident = incident
+        if incident.created:
+            self._state.answer = f"I opened incident {incident.incident_id} for this. The on-call team will follow up."
+        else:
+            self._state.answer = (
+                f"This matches open incident {incident.incident_id} ({incident.title}). "
+                f"You are one of {incident.reporter_count} people who reported it; updates will come there."
+            )
+        self._state.status = RunStatus.COMPLETED
+        return self._state
+
     async def _await_approval(self, request: AgentRunRequest, call: ToolCall, step: int) -> bool:
         run_id = workflow.info().workflow_id
         self._state.approval_id = await workflow.execute_activity(
@@ -114,3 +147,17 @@ class AgentRunWorkflow:
     @workflow.query(name=Queries.STATE)
     def state(self) -> AgentRunState:
         return self._state
+
+
+@workflow.defn(name=Workflows.INCIDENT_REPORT)
+class IncidentReportWorkflow:
+    @workflow.run
+    async def run(self, report: IncidentReport) -> IncidentResult:
+        return await workflow.execute_activity(
+            Activities.REPORT_INCIDENT,
+            report,
+            result_type=IncidentResult,
+            task_queue=TOOLS,
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=DEFAULT_RETRY,
+        )

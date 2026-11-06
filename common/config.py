@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     gpu_offload_backlog: int = 64
 
     max_inflight_requests: int = 64
+
+    incident_similarity: float = 0.82
+    incident_window_minutes: int = 60
     max_ingest_backlog: int = 500
     max_agent_backlog: int = 100
 
