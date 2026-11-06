@@ -1,0 +1,128 @@
+{
+  "realm": "antara",
+  "enabled": true,
+  "sslRequired": "none",
+  "groups": [
+    {
+      "name": "employees"
+    },
+    {
+      "name": "contractors"
+    },
+    {
+      "name": "managers"
+    },
+    {
+      "name": "security-leads"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "antara-web",
+      "name": "Antara web app",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@antara.test",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Employee",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "antara-dev",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/employees"
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "email": "bob@antara.test",
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Contractor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "antara-dev",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/contractors"
+      ]
+    },
+    {
+      "username": "carol",
+      "enabled": true,
+      "email": "carol@antara.test",
+      "emailVerified": true,
+      "firstName": "Carol",
+      "lastName": "Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "antara-dev",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/managers",
+        "/employees"
+      ]
+    },
+    {
+      "username": "dave",
+      "enabled": true,
+      "email": "dave@antara.test",
+      "emailVerified": true,
+      "firstName": "Dave",
+      "lastName": "SecurityLead",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "antara-dev",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/security-leads",
+        "/employees"
+      ]
+    }
+  ]
+}

@@ -80,6 +80,9 @@ services:
     environment:
       <<: *app-env
       SERVICE_NAME: api
+      AUTH_MODE: ${AUTH_MODE:-headers}
+      OIDC_ISSUER: http://localhost:8180/realms/antara
+      OIDC_JWKS_URL: http://keycloak:8080/realms/antara/protocol/openid-connect/certs
     ports:
       - "8000:8000"
 
@@ -121,6 +124,20 @@ services:
     environment:
       <<: *app-env
       SERVICE_NAME: reconciler
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    profiles: ["auth"]
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin-dev
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./keycloak/antara-realm.json:/opt/keycloak/data/import/antara-realm.json:ro
+    ports:
+      - "8180:8080"
 
   jaeger:
     image: jaegertracing/all-in-one:1.62.0
