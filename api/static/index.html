@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antara Helpdesk</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5d6675; --line: #dfe3ea;
+    --accent: #2357d9; --accent-ink: #ffffff; --good: #1d7a46; --warn: #a15c00; --bad: #b42318; --chip: #eef2fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b2029; --ink: #e7eaf0; --muted: #9aa3b2; --line: #2c333f;
+      --accent: #6f95ff; --accent-ink: #0d1220; --good: #5fcf8f; --warn: #f2b45a; --bad: #ff7a6e; --chip: #232b3a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px;
+           background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; }
+  header small { color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  section h2 { margin: 0 0 12px; font-size: 15px; }
+  label { font-size: 13px; color: var(--muted); }
+  select, input[type=text], textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+           background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { resize: vertical; min-height: 64px; }
+  button { padding: 8px 14px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: inherit; cursor: pointer; }
+  button.secondary { background: var(--chip); color: var(--ink); }
+  button.danger { background: var(--bad); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+  .chat { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
+  .msg { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }
+  .msg.user { align-self: flex-end; background: var(--chip); max-width: 80%; }
+  .msg.bot { background: var(--bg); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); font-size: 12px; }
+  .chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+  .cite { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .error { color: var(--bad); font-size: 13px; min-height: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Antara Helpdesk</h1>
+    <small>Private IT and security assistant. Nothing leaves the network.</small>
+  </div>
+  <div class="row">
+    <label for="who">Signed in as</label>
+    <select id="who" style="width:auto">
+      <option value="alice|employees">alice (employee)</option>
+      <option value="bob|contractors">bob (contractor)</option>
+      <option value="carol|managers,employees">carol (manager)</option>
+      <option value="dave|security-leads,employees">dave (security lead)</option>
+    </select>
+  </div>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>Ask the helpdesk</h2>
+      <div id="chat" class="chat"><div class="empty">Ask a policy question, request access, or report a problem.</div></div>
+      <form id="ask" class="row">
+        <input id="question" type="text" class="grow" placeholder="e.g. How do contractors get VPN access?" autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+      <div id="ask-error" class="error"></div>
+    </section>
+  </div>
+  <div>
+    <section id="inbox-section" hidden>
+      <h2>Approvals inbox</h2>
+      <div id="inbox"></div>
+    </section>
+    <section>
+      <h2>Upload a document</h2>
+      <form id="upload">
+        <input id="file" type="file" accept=".pdf,.txt,.md" required>
+        <div style="margin-top:8px"><label for="acl">Who can read it (groups)</label>
+          <input id="acl" type="text" value="employees,contractors"></div>
+        <div class="row" style="margin-top:10px"><button type="submit">Upload</button></div>
+      </form>
+      <div id="upload-error" class="error"></div>
+    </section>
+    <section>
+      <h2>Documents</h2>
+      <div id="docs"></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const terminal = new Set(["COMPLETED", "DENIED", "FAILED"]);
+
+function identity() {
+  const [user, groups] = $("who").value.split("|");
+  return { user, groups };
+}
+
+function headers(extra = {}) {
+  const { user, groups } = identity();
+  return { "X-User-Id": user, "X-User-Groups": groups, ...extra };
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { ...options, headers: headers(options.headers) });
+  if (!response.ok) {
+    const retry = response.headers.get("Retry-After");
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch (_) {}
+    throw new Error(response.status === 429 ? `Busy: ${detail}. Retry in ${retry}s.` : detail);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value; else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  return node;
+}
+
+function statusChip(state) {
+  const kind = { COMPLETED: "good", DENIED: "bad", FAILED: "bad", ESCALATED: "warn", WAITING_APPROVAL: "warn" }[state.status] || "";
+  return el("span", { class: `chip ${kind}` }, state.status.replace("_", " ").toLowerCase());
+}
+
+function renderBot(node, state) {
+  node.replaceChildren();
+  node.append(el("div", {}, state.answer || (terminal.has(state.status) ? "No answer." : "Working on it...")));
+  const meta = el("div", { class: "meta" }, statusChip(state));
+  if (state.intent) meta.append(el("span", { class: "chip" }, state.intent));
+  if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
+  if (state.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
+  if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
+  for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
+  node.append(meta);
+  (state.citations || []).forEach((cite, index) => {
+    node.append(el("div", { class: "cite" }, `[${index + 1}] p.${cite.page_number} · ${cite.text.slice(0, 180)}${cite.text.length > 180 ? "…" : ""}`));
+  });
+}
+
+async function poll(runId, node) {
+  for (let attempt = 0; attempt < 600; attempt++) {
+    try {
+      const state = await api(`/agent/runs/${runId}`);
+      renderBot(node, state);
+      if (terminal.has(state.status)) return;
+    } catch (_) {}
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+}
+
+$("ask").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const question = $("question").value.trim();
+  if (!question) return;
+  $("ask-error").textContent = "";
+  const chat = $("chat");
+  chat.querySelector(".empty")?.remove();
+  chat.append(el("div", { class: "msg user" }, question));
+  const bot = el("div", { class: "msg bot" }, "Working on it...");
+  chat.append(bot);
+  chat.scrollTop = chat.scrollHeight;
+  $("question").value = "";
+  try {
+    const { run_id } = await api("/agent/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    await poll(run_id, bot);
+  } catch (error) {
+    bot.remove();
+    $("ask-error").textContent = error.message;
+  }
+});
+
+$("upload").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("upload-error").textContent = "";
+  const form = new FormData();
+  form.append("file", $("file").files[0]);
+  form.append("groups", $("acl").value);
+  try {
+    await api("/documents", { method: "POST", body: form });
+    $("file").value = "";
+    loadDocs();
+  } catch (error) {
+    $("upload-error").textContent = error.message;
+  }
+});
+
+async function loadDocs() {
+  const box = $("docs");
+  try {
+    const docs = await api("/documents");
+    if (!docs.length) { box.replaceChildren(el("div", { class: "empty" }, "No documents you can read yet.")); return; }
+    const table = el("table", {}, el("tr", {}, el("th", {}, "Title"), el("th", {}, "Status"), el("th", {}, "")));
+    for (const doc of docs) {
+      const remove = el("button", { class: "secondary" }, "Delete");
+      remove.addEventListener("click", async () => { await api(`/documents/${doc.document_id}`, { method: "DELETE" }); loadDocs(); });
+      const kind = { READY: "good", FAILED: "bad" }[doc.status] || "warn";
+      table.append(el("tr", {}, el("td", {}, doc.title), el("td", {}, el("span", { class: `chip ${kind}` }, doc.status.toLowerCase())), el("td", {}, remove)));
+    }
+    box.replaceChildren(table);
+  } catch (error) {
+    box.replaceChildren(el("div", { class: "error" }, error.message));
+  }
+}
+
+async function loadInbox() {
+  const { groups } = identity();
+  const approver = groups.includes("managers") || groups.includes("security-leads");
+  $("inbox-section").hidden = !approver;
+  if (!approver) return;
+  const box = $("inbox");
+  try {
+    const items = await api("/approvals");
+    if (!items.length) { box.replaceChildren(el("div", { class: "empty" }, "Nothing waiting for you.")); return; }
+    box.replaceChildren(...items.map((item) => {
+      const approve = el("button", {}, "Approve");
+      const deny = el("button", { class: "danger" }, "Deny");
+      const decide = (approved) => async () => {
+        approve.disabled = deny.disabled = true;
+        try {
+          await api(`/approvals/${item.approval_id}/decision`, {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ approved }),
+          });
+        } catch (error) { alert(error.message); }
+        loadInbox();
+      };
+      approve.addEventListener("click", decide(true));
+      deny.addEventListener("click", decide(false));
+      return el("div", { class: "msg bot", style: "margin-bottom:8px" },
+        el("div", {}, `${item.requester_id} wants ${item.role} on ${item.system}`),
+        el("div", { class: "meta" }, item.reason || "No reason given", item.escalated ? el("span", { class: "chip warn" }, "escalated") : ""),
+        el("div", { class: "row", style: "margin-top:8px" }, approve, deny));
+    }));
+  } catch (error) {
+    box.replaceChildren(el("div", { class: "error" }, error.message));
+  }
+}
+
+$("who").addEventListener("change", () => { loadDocs(); loadInbox(); });
+loadDocs();
+loadInbox();
+setInterval(() => { loadDocs(); loadInbox(); }, 5000);
+</script>
+</body>
+</html>

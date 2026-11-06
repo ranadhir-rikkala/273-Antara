@@ -2,8 +2,10 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
@@ -71,6 +73,14 @@ async def admit_ingest(client: Client = Depends(temporal)) -> None:
 
 async def admit_agent(client: Client = Depends(temporal)) -> None:
     await agent_gate.admit(client)
+
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+async def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/healthz")
