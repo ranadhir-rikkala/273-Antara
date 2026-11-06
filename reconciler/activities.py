@@ -1,26 +1,17 @@
 from temporalio import activity
-from temporalio.client import Client, WorkflowExecutionStatus
+from temporalio.client import WorkflowExecutionStatus
 from temporalio.service import RPCError
 
 from common.db import pool
 from common.models import IngestRequest, VersionStatus
 from common.names import Activities
-from common.temporal_client import connect
+from common.temporal_client import shared
 
 STALE_AFTER = "5 minutes"
 
-_client: Client | None = None
-
-
-async def _temporal() -> Client:
-    global _client
-    if _client is None:
-        _client = await connect()
-    return _client
-
 
 async def _ingest_running(version_id: str) -> bool:
-    client = await _temporal()
+    client = await shared()
     try:
         description = await client.get_workflow_handle(f"ingest-{version_id}").describe()
     except RPCError:
