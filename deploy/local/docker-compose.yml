@@ -1,0 +1,21 @@
+name: antara-k3s
+
+services:
+  k3s:
+    image: rancher/k3s:v1.31.4-k3s1
+    command: ["server", "--disable=metrics-server", "--write-kubeconfig-mode=644", "--tls-san=127.0.0.1"]
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    environment:
+      K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      - ./.kube:/output
+    ports:
+      - "6443:6443"
+      - "8000:80"
+
+volumes:
+  k3s-data:
