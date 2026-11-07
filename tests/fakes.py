@@ -40,9 +40,7 @@ class FakeModel:
         self.chat_calls.append(messages)
         return self.reply
 
-    async def generate_with_tools(
-        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    async def generate_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
         self.chat_calls.append(messages)
         self.offered_tools.append([tool["function"]["name"] for tool in tools])
         return self.tool_message or {"content": self.reply}
@@ -345,8 +343,16 @@ class FakeCatalog:
     def __init__(self) -> None:
         self.uploads: list[dict[str, Any]] = []
 
-    async def create_upload(self, document_id: str, version_id: str, owner_id: str, title: str, object_key: str,
-                            content_type: str, groups: list[str]) -> None:
+    async def create_upload(
+        self,
+        document_id: str,
+        version_id: str,
+        owner_id: str,
+        title: str,
+        object_key: str,
+        content_type: str,
+        groups: list[str],
+    ) -> None:
         self.uploads.append({"document_id": document_id, "title": title, "groups": groups, "owner_id": owner_id})
 
     async def list_for_groups(self, groups: list[str]) -> list[dict[str, Any]]:
