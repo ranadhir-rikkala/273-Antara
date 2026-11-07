@@ -1,4 +1,4 @@
-from agent.triage import classify_by_rules, parse_intent
+from agent.triage import classify_by_rules, needs_model, parse_intent
 from common.models import Intent
 
 
@@ -14,3 +14,9 @@ def test_model_reply_is_parsed_or_rejected() -> None:
     assert parse_intent(" Incident.") == Intent.INCIDENT
     assert parse_intent("question") == Intent.QUESTION
     assert parse_intent("I think this is an incident") is None
+
+
+def test_model_is_only_asked_about_ambiguous_requests() -> None:
+    assert needs_model("How do contractors get VPN access?", Intent.QUESTION) is False
+    assert needs_model("The VPN is down", Intent.INCIDENT) is False
+    assert needs_model("Can you set up my laptop encryption?", Intent.QUESTION) is True
