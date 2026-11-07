@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from temporalio.client import Client
 
 from api import services
@@ -19,7 +19,7 @@ from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
 from common import storage
 from common.config import settings
 from common.db import pool
-from common.models import AgentRunRequest, ApprovalDecision, UserContext
+from common.models import AgentRunRequest, ApprovalDecision, ConversationTurn, UserContext
 from common.names import Signals, Workflows
 from common.queues import AGENT, INGEST_CPU
 from common.storage import S3ObjectStore
@@ -51,8 +51,14 @@ app.mount("/metrics", make_asgi_app())
 FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,metrics")
 
 
+class HistoryTurn(BaseModel):
+    question: str = Field(max_length=4000)
+    answer: str = Field(max_length=4000)
+
+
 class AskRequest(BaseModel):
     question: str
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=10)
 
 
 class ApprovalRequest(BaseModel):
@@ -156,7 +162,14 @@ async def start_run(
         raise HTTPException(status_code=422, detail=str(error)) from error
     run_id = f"agent-{uuid.uuid4()}"
     await client.start_workflow(
-        Workflows.AGENT_RUN, AgentRunRequest(question=question, user=user), id=run_id, task_queue=AGENT
+        Workflows.AGENT_RUN,
+        AgentRunRequest(
+            question=question,
+            user=user,
+            history=[ConversationTurn(turn.question, turn.answer) for turn in body.history],
+        ),
+        id=run_id,
+        task_queue=AGENT,
     )
     return {"run_id": run_id}
 
