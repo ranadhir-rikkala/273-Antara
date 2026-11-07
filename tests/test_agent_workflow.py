@@ -30,6 +30,7 @@ from common.names import Activities, Queries, Signals, Workflows
 from common.queues import AGENT, TOOLS
 
 executed: list[str] = []
+tool_offers: list[bool] = []
 escalations: list[str] = []
 
 
@@ -69,7 +70,8 @@ async def fake_retrieve(request: RetrieveRequest) -> list[ChunkResult]:
 
 @activity.defn(name=Activities.GENERATE)
 async def fake_generate(request: GenerateRequest) -> ModelTurn:
-    if "access" in request.question and not request.tool_results:
+    tool_offers.append(request.allow_tools)
+    if request.allow_tools and "access" in request.question and not request.tool_results:
         return ModelTurn(
             tool_call=ToolCall("request_access", {"system": "prod-db", "role": "read"}, requires_approval=True)
         )
@@ -190,3 +192,16 @@ async def test_repeated_question_is_served_from_cache() -> None:
     assert second.answer == first.answer
     assert second.citations[0].chunk_id == "chunk-1"
     assert retrievals == ["How do I reset my password?"]
+
+
+async def test_plain_questions_are_never_offered_tools() -> None:
+    tool_offers.clear()
+    executed.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            result = await (await _run(env, "agent-question-access", "How do contractors get VPN access?")).result()
+    assert result.intent == "question"
+    assert result.status == RunStatus.COMPLETED
+    assert tool_offers == [False]
+    assert executed == []

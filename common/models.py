@@ -108,6 +108,7 @@ class GenerateRequest:
     question: str
     chunks: list[ChunkResult]
     tool_results: list[dict[str, Any]] = field(default_factory=list)
+    allow_tools: bool = True
 
 
 @dataclass

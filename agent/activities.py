@@ -55,6 +55,8 @@ def _arguments(raw: Any) -> dict[str, Any]:
 async def generate_answer(request: GenerateRequest) -> ModelTurn:
     llm = LLMProvider()
     try:
+        if not request.allow_tools:
+            return ModelTurn(answer=await llm.generate(_messages(request)))
         message = await llm.generate_with_tools(_messages(request), schemas())
     finally:
         await llm.aclose()

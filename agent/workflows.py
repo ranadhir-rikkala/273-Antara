@@ -78,7 +78,12 @@ class AgentRunWorkflow:
         for step in range(MAX_STEPS):
             turn = await workflow.execute_activity(
                 Activities.GENERATE,
-                GenerateRequest(question=request.question, chunks=chunks, tool_results=tool_results),
+                GenerateRequest(
+                    question=request.question,
+                    chunks=chunks,
+                    tool_results=tool_results,
+                    allow_tools=self._state.intent == Intent.ACTION,
+                ),
                 result_type=ModelTurn,
                 task_queue=AGENT,
                 start_to_close_timeout=timedelta(minutes=3),
