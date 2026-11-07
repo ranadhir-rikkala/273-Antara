@@ -8,6 +8,7 @@ with workflow.unsafe.imports_passed_through():
     from common.names import Activities, Workflows
     from common.queues import INGEST_CPU, RECONCILER
     from common.retry import DEFAULT_RETRY
+    from reconciler.services import ingest_workflow_id
 
 
 @workflow.defn(name=Workflows.RECONCILER)
@@ -26,7 +27,7 @@ class ReconcilerWorkflow:
             await workflow.start_child_workflow(
                 Workflows.INGEST,
                 request,
-                id=f"ingest-{request.version_id}",
+                id=ingest_workflow_id(request.version_id),
                 task_queue=INGEST_CPU,
                 parent_close_policy=ParentClosePolicy.ABANDON,
             )
