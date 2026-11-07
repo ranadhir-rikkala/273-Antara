@@ -19,6 +19,7 @@ class Activities:
     EXECUTE_TOOL = "execute_tool"
     OPEN_APPROVAL = "open_approval"
     ESCALATE_APPROVAL = "escalate_approval"
+    EXPIRE_APPROVAL = "expire_approval"
     CLASSIFY = "classify_request"
     REPORT_INCIDENT = "report_incident"
     CACHE_LOOKUP = "lookup_cached_answer"

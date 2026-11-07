@@ -250,3 +250,10 @@ async def test_tool_calls_with_missing_details_become_a_clarifying_question() ->
     )
     assert turn.tool_call is None and turn.needs_input is True
     assert "What is the problem" in turn.answer
+
+
+async def test_expiring_an_approval_is_audited() -> None:
+    store, audit = FakeApprovalStore(), FakeAudit()
+    await services.expire_approval("approval-9", store, audit)
+    assert store.expired == ["approval-9"]
+    assert audit.entries == [("system", "approval.expired", {"approval_id": "approval-9"})]

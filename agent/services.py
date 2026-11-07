@@ -148,6 +148,11 @@ async def escalate_approval(approval_id: str, store: ApprovalStore, audit: Audit
     await audit.record("system", "approval.escalated", {"approval_id": approval_id})
 
 
+async def expire_approval(approval_id: str, store: ApprovalStore, audit: AuditLog) -> None:
+    await store.expire(approval_id)
+    await audit.record("system", "approval.expired", {"approval_id": approval_id})
+
+
 async def report_incident(
     report: IncidentReport,
     embedder: Embedder,

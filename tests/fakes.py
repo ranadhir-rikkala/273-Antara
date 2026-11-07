@@ -126,6 +126,7 @@ class FakeApprovalStore:
     def __init__(self) -> None:
         self.opened: dict[str, dict[str, Any]] = {}
         self.escalated: list[str] = []
+        self.expired: list[str] = []
 
     async def open(self, approval_key: str, run_id: str, requester_id: str, call: ToolCall) -> str:
         self.opened.setdefault(approval_key, {"id": f"approval-{len(self.opened) + 1}", "run_id": run_id})
@@ -133,6 +134,9 @@ class FakeApprovalStore:
 
     async def escalate(self, approval_id: str) -> None:
         self.escalated.append(approval_id)
+
+    async def expire(self, approval_id: str) -> None:
+        self.expired.append(approval_id)
 
 
 class _IncidentWorkspace:

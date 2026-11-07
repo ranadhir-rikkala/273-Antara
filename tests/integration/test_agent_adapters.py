@@ -118,3 +118,20 @@ async def test_cached_answers_expire_when_the_cited_document_is_deleted(db) -> N
 async def test_audit_log_records_entries(db) -> None:
     await PostgresAuditLog(db).record("alice", "agent.retrieve", {"query": "vpn"})
     assert await count(db, "SELECT count(*) FROM audit_log") == 1
+
+
+async def test_expiring_only_touches_pending_approvals(db) -> None:
+    store = PostgresApprovalStore(db)
+    pending = await store.open(
+        "run-7:0", "run-7", "alice", ToolCall("request_access", {"system": "vpn", "role": "read"})
+    )
+    decided = await store.open(
+        "run-8:0", "run-8", "alice", ToolCall("request_access", {"system": "vpn", "role": "read"})
+    )
+    async with db.connection() as conn:
+        await conn.execute("UPDATE approvals SET status = 'APPROVED' WHERE approval_id = %s", (decided,))
+    await store.expire(pending)
+    await store.expire(decided)
+    async with db.connection() as conn:
+        rows = dict(await (await conn.execute("SELECT run_id, status FROM approvals")).fetchall())
+    assert rows == {"run-7": "EXPIRED", "run-8": "APPROVED"}

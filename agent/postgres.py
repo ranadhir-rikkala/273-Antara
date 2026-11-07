@@ -175,6 +175,14 @@ class PostgresApprovalStore:
                 "UPDATE approvals SET escalated = true WHERE approval_id = %s AND status = 'PENDING'", (approval_id,)
             )
 
+    async def expire(self, approval_id: str) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "UPDATE approvals SET status = 'EXPIRED', decided_at = now() "
+                "WHERE approval_id = %s AND status = 'PENDING'",
+                (approval_id,),
+            )
+
 
 class _IncidentWorkspace:
     def __init__(self, conn: AsyncConnection) -> None:

@@ -24,6 +24,7 @@ class RunStatus(StrEnum):
     ESCALATED = "ESCALATED"
     COMPLETED = "COMPLETED"
     DENIED = "DENIED"
+    EXPIRED = "EXPIRED"
     FAILED = "FAILED"
 
 

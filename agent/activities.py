@@ -71,6 +71,12 @@ async def escalate_approval(approval_id: str) -> None:
     await services.escalate_approval(approval_id, PostgresApprovalStore(db), PostgresAuditLog(db))
 
 
+@activity.defn(name=Activities.EXPIRE_APPROVAL)
+async def expire_approval(approval_id: str) -> None:
+    db = await pool()
+    await services.expire_approval(approval_id, PostgresApprovalStore(db), PostgresAuditLog(db))
+
+
 @activity.defn(name=Activities.REPORT_INCIDENT)
 async def report_incident(report: IncidentReport) -> IncidentResult:
     async with model_session() as model:

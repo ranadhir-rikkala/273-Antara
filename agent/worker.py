@@ -6,6 +6,7 @@ from agent.activities import (
     classify_request,
     escalate_approval,
     execute_tool,
+    expire_approval,
     generate_answer,
     lookup_cached_answer,
     open_approval,
@@ -26,7 +27,7 @@ async def main() -> None:
             client,
             task_queue=TOOLS,
             workflows=[IncidentReportWorkflow],
-            activities=[execute_tool, open_approval, escalate_approval, report_incident],
+            activities=[execute_tool, open_approval, escalate_approval, expire_approval, report_incident],
             max_concurrent_activities=settings.max_concurrent_activities,
         )
     else:
