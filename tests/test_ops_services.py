@@ -113,7 +113,7 @@ async def test_snapshot_reports_each_section_and_survives_partial_failures() -> 
     }
     assert state["queues"][-1]["name"] == "reconciler" and "temporal busy" in state["queues"][-1]["error"]
     assert "visibility down" in state["errors"]["workflows"]
-    assert state["metrics"] == {"rejected_429": 12.0, "activities_per_second": {"agent-a": 0.5}}
+    assert state["metrics"] == {"rejected_429": 12.0, "model_busy_429": 12.0, "activities_per_second": {"agent-a": 0.5}}
     healthy = await services.snapshot(Queues(), Workflows(), Cluster(), Model(), Metrics(), Store())
     assert healthy["summary"]["workflows_running"] == 1 and healthy["errors"] == {}
 

@@ -12,8 +12,9 @@ GPU_LANE = "ingest-gpu"
 OPERATOR_GROUP = "operators"
 MIN_OUTAGE_SECONDS, MAX_OUTAGE_SECONDS = 5, 300
 MAX_FLOOD_DOCS, MAX_FLOOD_QUESTIONS = 300, 100
-RECENT_WORKFLOWS, OPEN_INCIDENTS, RECENT_EVENTS = 15, 5, 25
+RECENT_WORKFLOWS, OPEN_INCIDENTS, RECENT_EVENTS = 40, 5, 25
 REJECTED_QUERY = "sum(antara_api_rejected_total)"
+MODEL_BUSY_QUERY = 'sum(antara_gateway_rejected_total{reason="busy"})'
 THROUGHPUT_QUERY = 'sum by (instance) (rate({__name__=~"temporal_activity_execution_latency(_seconds)?_count"}[1m]))'
 
 
@@ -67,8 +68,10 @@ async def snapshot(
     (pods, pods_error), (recent, workflows_error), (health, model_error) = await asyncio.gather(
         _safe(cluster.pods()), _safe(workflows.recent(RECENT_WORKFLOWS)), _safe(model.health())
     )
-    (rejected, _), (throughput, _) = await asyncio.gather(
-        _safe(metrics.scalar(REJECTED_QUERY)), _safe(metrics.by_label(THROUGHPUT_QUERY, "instance"))
+    (rejected, _), (model_busy, _), (throughput, _) = await asyncio.gather(
+        _safe(metrics.scalar(REJECTED_QUERY)),
+        _safe(metrics.scalar(MODEL_BUSY_QUERY)),
+        _safe(metrics.by_label(THROUGHPUT_QUERY, "instance")),
     )
     counts, incidents, events = await asyncio.gather(
         store.counts(), store.open_incidents(OPEN_INCIDENTS), store.events(RECENT_EVENTS)
@@ -80,7 +83,11 @@ async def snapshot(
         "pods": pods,
         "workflows": recent,
         "model": health or {"ok": False},
-        "metrics": {"rejected_429": rejected, "activities_per_second": throughput or {}},
+        "metrics": {
+            "rejected_429": rejected,
+            "model_busy_429": model_busy,
+            "activities_per_second": throughput or {},
+        },
         "counts": counts,
         "incidents": incidents,
         "events": events,

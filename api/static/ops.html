@@ -238,7 +238,8 @@ function render(state) {
     kpi("Workflows running", s.workflows_running),
     kpi("Approvals pending", s.approvals_pending),
     kpi("Open incidents", s.incidents_open, s.incidents_open ? "warn" : ""),
-    kpi("Rejected (429)", Math.round(rejected), rejected ? "warn" : ""),
+    kpi("API said slow down (429)", Math.round(rejected), rejected ? "warn" : ""),
+    kpi("Model busy (429)", Math.round(state.metrics.model_busy_429 ?? 0), state.metrics.model_busy_429 ? "warn" : ""),
     kpi("Model", state.model.chaos ? "OUTAGE" : (state.model.ok ? "healthy" : "unknown"), state.model.chaos ? "bad" : ""),
   );
   const maxBacklog = Math.max(10, ...state.queues.map((queue) => queue.backlog || 0));
@@ -264,7 +265,8 @@ function render(state) {
   const throughput = Object.entries(state.metrics.activities_per_second || {}).sort((a, b) => b[1] - a[1]);
   $("throughput").replaceChildren(...(throughput.length ? throughput.map(([pod, rate]) =>
     el("div", {}, el("code", {}, pod), el("span", {}, `${rate.toFixed(2)}/s`))) : [el("span", { class: "muted" }, "Idle. Flood traffic to watch work spread across pods.")]));
-  $("workflows").replaceChildren(...state.workflows.map((workflow) => el("tr", {},
+  const interesting = state.workflows.filter((workflow) => workflow.type !== "ReconcilerWorkflow").slice(0, 12);
+  $("workflows").replaceChildren(...interesting.map((workflow) => el("tr", {},
     el("td", {}, workflow.type.replace("Workflow", "")),
     el("td", {}, el("code", {}, workflow.id.length > 26 ? `${workflow.id.slice(0, 26)}…` : workflow.id)),
     el("td", {}, el("span", { class: `chip ${workflow.status}` }, workflow.status.toLowerCase())),
