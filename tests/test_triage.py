@@ -1,4 +1,4 @@
-from agent.triage import classify_by_rules, needs_model, parse_intent
+from agent.triage import classify_by_rules, needs_model, parse_intent, tools_for
 from common.models import Intent
 
 
@@ -20,3 +20,10 @@ def test_model_is_only_asked_about_ambiguous_requests() -> None:
     assert needs_model("How do contractors get VPN access?", Intent.QUESTION) is False
     assert needs_model("The VPN is down", Intent.INCIDENT) is False
     assert needs_model("Can you set up my laptop encryption?", Intent.QUESTION) is True
+
+
+def test_requests_are_narrowed_to_the_matching_tool() -> None:
+    assert tools_for("I need read access to the production database") == ["request_access"]
+    assert tools_for("What is the status of my ticket 42?") == ["get_ticket_status"]
+    assert tools_for("Please create a ticket, my screen does not lock") == ["create_ticket"]
+    assert tools_for("Can you help me with something?") is None

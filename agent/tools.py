@@ -119,11 +119,12 @@ HANDLERS: dict[str, Handler] = {
 }
 
 
-def schemas() -> list[dict[str, Any]]:
+def schemas(names: list[str] | None = None) -> list[dict[str, Any]]:
     return [
         {
             "type": "function",
             "function": {"name": spec.name, "description": spec.description, "parameters": spec.parameters},
         }
         for spec in REGISTRY.values()
+        if names is None or spec.name in names
     ]

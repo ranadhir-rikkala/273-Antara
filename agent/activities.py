@@ -57,7 +57,7 @@ async def generate_answer(request: GenerateRequest) -> ModelTurn:
     try:
         if not request.allow_tools:
             return ModelTurn(answer=await llm.generate(_messages(request)))
-        message = await llm.generate_with_tools(_messages(request), schemas())
+        message = await llm.generate_with_tools(_messages(request), schemas(request.tool_names))
     finally:
         await llm.aclose()
     calls = message.get("tool_calls") or []

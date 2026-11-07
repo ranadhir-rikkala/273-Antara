@@ -31,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
 
 with workflow.unsafe.imports_passed_through():
     from agent.summary import summarize_tool_result
+    from agent.triage import tools_for
 
 MAX_STEPS = 6
 ESCALATE_AFTER = timedelta(minutes=2)
@@ -88,6 +89,7 @@ class AgentRunWorkflow:
                     chunks=chunks,
                     tool_results=tool_results,
                     allow_tools=self._state.intent == Intent.ACTION,
+                    tool_names=tools_for(request.question),
                 ),
                 result_type=ModelTurn,
                 task_queue=AGENT,
