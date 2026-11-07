@@ -380,6 +380,9 @@ class FakeCatalog:
     async def get(self, document_id: str) -> dict[str, Any] | None:
         return None
 
+    async def count_in_flight(self) -> int:
+        return len(self.uploads)
+
 
 class _DecisionWorkspace:
     def __init__(self, inbox: "FakeInbox") -> None:

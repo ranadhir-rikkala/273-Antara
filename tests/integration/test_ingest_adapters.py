@@ -80,6 +80,7 @@ async def test_version_status_and_reconciler_scan(db) -> None:
     versions = PostgresVersionStore(db)
     await versions.set_status(PUBLIC[1], "PROCESSING")
     await versions.set_text_key(PUBLIC[1], "text/a.txt")
+    assert await PostgresDocumentCatalog(db).count_in_flight() == 1
     stale = await PostgresVersionScanner(db).stale_versions(["PROCESSING"], 0)
     assert [request.version_id for request in stale] == [PUBLIC[1]]
     assert await PostgresVersionScanner(db).stale_versions(["PROCESSING"], 60) == []

@@ -66,6 +66,16 @@ class PostgresDocumentCatalog:
             for row in rows
         ]
 
+    async def count_in_flight(self) -> int:
+        async with self._pool.connection() as conn:
+            row = await (
+                await conn.execute(
+                    "SELECT count(*) FROM document_versions WHERE status = ANY(%s)",
+                    ([VersionStatus.UPLOADED, VersionStatus.PROCESSING],),
+                )
+            ).fetchone()
+        return row[0]
+
     async def get(self, document_id: str) -> dict[str, Any] | None:
         async with self._pool.connection() as conn:
             document = await (
