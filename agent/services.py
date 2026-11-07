@@ -38,6 +38,7 @@ SYSTEM_PROMPT = (
 )
 
 INCIDENT_TITLE_LENGTH = 120
+NOT_FOUND_ANSWER = "I couldn't find that in company documents. Try rephrasing, or ask the IT helpdesk."
 
 
 class UnknownToolError(Exception):
@@ -88,7 +89,13 @@ def parse_arguments(raw: Any) -> dict[str, Any]:
     return json.loads(raw or "{}")
 
 
-async def generate(request: GenerateRequest, model: ChatModel) -> ModelTurn:
+def is_supported(chunks: list[ChunkResult], min_score: float) -> bool:
+    return bool(chunks) and chunks[0].score >= min_score
+
+
+async def generate(request: GenerateRequest, model: ChatModel, min_score: float = 0.0) -> ModelTurn:
+    if not request.allow_tools and not is_supported(request.chunks, min_score):
+        return ModelTurn(answer=NOT_FOUND_ANSWER)
     messages = build_messages(request)
     if not request.allow_tools:
         return ModelTurn(answer=await model.generate(messages))

@@ -46,7 +46,7 @@ async def retrieve_documents(request: RetrieveRequest) -> list[ChunkResult]:
 @activity.defn(name=Activities.GENERATE)
 async def generate_answer(request: GenerateRequest) -> ModelTurn:
     async with model_session() as model:
-        return await services.generate(request, model)
+        return await services.generate(request, model, settings.answer_min_score)
 
 
 @activity.defn(name=Activities.EXECUTE_TOOL)

@@ -188,3 +188,14 @@ async def test_cached_answers_are_found_until_their_source_version_changes() -> 
     assert hit.answer == "Ask the helpdesk [1]"
     assert other_groups is None
     assert stale is None
+
+
+async def test_questions_without_a_confident_passage_get_a_fixed_answer_and_no_model_call() -> None:
+    model = FakeModel(reply="The cafeteria serves pizza on Friday.")
+    weak = ChunkResult("doc-vpn", "ver-vpn", "chunk-1", "VPN policy", 1, 0.39)
+    no_passages = await services.generate(GenerateRequest("menu?", [], allow_tools=False), model, 0.6)
+    off_topic = await services.generate(GenerateRequest("menu?", [weak], allow_tools=False), model, 0.6)
+    assert no_passages.answer == off_topic.answer == services.NOT_FOUND_ANSWER
+    assert model.chat_calls == []
+    supported = await services.generate(GenerateRequest("vpn?", [VPN_CHUNK], allow_tools=False), model, 0.6)
+    assert supported.answer == "The cafeteria serves pizza on Friday."
