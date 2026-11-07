@@ -8,7 +8,11 @@
       "status": "COMPLETED",
       "intent": "question",
       "top_citation": "vpn-access.md",
-      "answer_contains_any": ["helpdesk", "help desk", "manager"],
+      "answer_contains_any": [
+        "helpdesk",
+        "help desk",
+        "manager"
+      ],
       "no_tools": true
     }
   },
@@ -21,7 +25,9 @@
       "status": "COMPLETED",
       "intent": "question",
       "top_citation": "password-policy.md",
-      "answer_contains_any": ["180"],
+      "answer_contains_any": [
+        "180"
+      ],
       "no_tools": true
     }
   },
@@ -34,7 +40,9 @@
       "status": "COMPLETED",
       "intent": "question",
       "top_citation": "production-access.md",
-      "answer_contains_any": ["security"],
+      "answer_contains_any": [
+        "security"
+      ],
       "no_tools": true
     }
   },
@@ -45,8 +53,14 @@
     "groups": "contractors",
     "expect": {
       "status": "COMPLETED",
-      "never_cites": ["hr-compensation-confidential.md"],
-      "answer_excludes": ["150,000", "190,000", "120,000"]
+      "never_cites": [
+        "hr-compensation-confidential.md"
+      ],
+      "answer_excludes": [
+        "150,000",
+        "190,000",
+        "120,000"
+      ]
     }
   },
   {
@@ -57,7 +71,23 @@
     "expect": {
       "status": "COMPLETED",
       "intent": "question",
-      "answer_contains_any": ["could not find", "couldn't find", "not find", "no information", "not available", "does not contain", "doesn't contain"],
+      "answer_contains_any": [
+        "couldn't find"
+      ],
+      "no_tools": true
+    }
+  },
+  {
+    "id": "unknown-topic-near-miss",
+    "question": "What is the parking policy?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "answer_contains_any": [
+        "couldn't find"
+      ],
       "no_tools": true
     }
   },
@@ -69,7 +99,9 @@
     "expect": {
       "status": "COMPLETED",
       "intent": "action",
-      "tools": ["create_ticket"],
+      "tools": [
+        "create_ticket"
+      ],
       "answer_starts_with": "I created ticket"
     }
   },
