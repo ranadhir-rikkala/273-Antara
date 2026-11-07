@@ -5,8 +5,8 @@ import pytest
 from psycopg_pool import AsyncConnectionPool
 
 TABLES = (
-    "answer_cache, incident_reports, incidents, access_grants, approvals, tickets, tool_actions, audit_log, "
-    "deletion_jobs, document_embeddings, document_chunks, document_acl, document_versions, documents"
+    "ops_events, answer_cache, incident_reports, incidents, access_grants, approvals, tickets, tool_actions, "
+    "audit_log, deletion_jobs, document_embeddings, document_chunks, document_acl, document_versions, documents"
 )
 
 
