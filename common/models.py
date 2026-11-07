@@ -154,6 +154,7 @@ class IncidentResult:
     title: str
     created: bool
     reporter_count: int
+    system: str | None = None
 
 
 @dataclass

@@ -153,20 +153,35 @@ class _IncidentWorkspace:
         scored = [
             (cosine(embedding, incident["embedding"]), incident_id, incident["title"])
             for incident_id, incident in self._state["incidents"].items()
-            if incident["open"]
+            if incident["open"] and incident["system"] is None
         ]
         best = max(scored, default=None)
         return None if best is None or best[0] < threshold else (best[1], best[2])
 
-    async def open_incident(self, title: str, embedding: Sequence[float]) -> str:
+    async def find_open_for_system(self, system: str, window_minutes: int) -> tuple[str, str] | None:
+        for incident_id, incident in self._state["incidents"].items():
+            if incident["open"] and incident["system"] == system:
+                return incident_id, incident["title"]
+        return None
+
+    async def open_incident(self, title: str, embedding: Sequence[float], system: str | None) -> str:
         incident_id = f"incident-{len(self._state['incidents']) + 1}"
-        self._state["incidents"][incident_id] = {"title": title, "embedding": list(embedding), "count": 0, "open": True}
+        self._state["incidents"][incident_id] = {
+            "title": title,
+            "embedding": list(embedding),
+            "count": 0,
+            "open": True,
+            "system": system,
+        }
         return incident_id
 
     async def add_report(self, report_id: str, incident_id: str, reporter_id: str, text: str) -> int:
         self._state["reports"][report_id] = incident_id
+        self._state.setdefault("reporters", {})[report_id] = reporter_id
         incident = self._state["incidents"][incident_id]
-        incident["count"] = sum(1 for linked in self._state["reports"].values() if linked == incident_id)
+        incident["count"] = len(
+            {self._state["reporters"][rid] for rid, linked in self._state["reports"].items() if linked == incident_id}
+        )
         return incident["count"]
 
     async def record(self, actor_id: str, action: str, detail: dict[str, Any]) -> None:

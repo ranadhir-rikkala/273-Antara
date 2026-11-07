@@ -33,6 +33,7 @@ _FIND_SIMILAR_INCIDENT_SQL = """
 SELECT incident_id::text, title
 FROM incidents
 WHERE status = 'OPEN'
+  AND system IS NULL
   AND updated_at > now() - make_interval(mins => %(window)s)
   AND 1 - (embedding <=> %(embedding)s::vector) >= %(threshold)s
 ORDER BY embedding <=> %(embedding)s::vector
@@ -200,11 +201,22 @@ class _IncidentWorkspace:
         ).fetchone()
         return None if row is None else (row[0], row[1])
 
-    async def open_incident(self, title: str, embedding: Sequence[float]) -> str:
+    async def find_open_for_system(self, system: str, window_minutes: int) -> tuple[str, str] | None:
         row = await (
             await self._conn.execute(
-                "INSERT INTO incidents (title, embedding) VALUES (%s, %s::vector) RETURNING incident_id::text",
-                (title, vector_literal(embedding)),
+                "SELECT incident_id::text, title FROM incidents WHERE status = 'OPEN' AND system = %s "
+                "AND updated_at > now() - make_interval(mins => %s) ORDER BY updated_at DESC LIMIT 1",
+                (system, window_minutes),
+            )
+        ).fetchone()
+        return None if row is None else (row[0], row[1])
+
+    async def open_incident(self, title: str, embedding: Sequence[float], system: str | None) -> str:
+        row = await (
+            await self._conn.execute(
+                "INSERT INTO incidents (title, embedding, system) VALUES (%s, %s::vector, %s) "
+                "RETURNING incident_id::text",
+                (title, vector_literal(embedding), system),
             )
         ).fetchone()
         return row[0]
@@ -217,7 +229,7 @@ class _IncidentWorkspace:
         row = await (
             await self._conn.execute(
                 "UPDATE incidents SET reporter_count = "
-                "(SELECT count(*) FROM incident_reports WHERE incident_id = %s), updated_at = now() "
+                "(SELECT count(DISTINCT reporter_id) FROM incident_reports WHERE incident_id = %s), updated_at = now() "
                 "WHERE incident_id = %s RETURNING reporter_count",
                 (incident_id, incident_id),
             )

@@ -199,3 +199,43 @@ async def test_questions_without_a_confident_passage_get_a_fixed_answer_and_no_m
     assert model.chat_calls == []
     supported = await services.generate(GenerateRequest("vpn?", [VPN_CHUNK], allow_tools=False), model, 0.6)
     assert supported.answer == "The cafeteria serves pizza on Friday."
+
+
+async def test_a_storm_becomes_one_incident_per_affected_system() -> None:
+    model, unit_of_work = FakeModel(), FakeIncidentUnitOfWork()
+    storm = [
+        ("u1", "The VPN is down"),
+        ("u2", "vpn not connecting"),
+        ("u3", "VPN down for me too"),
+        ("u4", "cannot connect to VPN"),
+        ("u5", "Email is down"),
+        ("u6", "VPN outage again"),
+        ("u1", "VPN still down"),
+    ]
+    results = [
+        await services.report_incident(
+            IncidentReport(f"r{index}", UserContext(user, ["employees"]), text), model, unit_of_work, 60, 0.8
+        )
+        for index, (user, text) in enumerate(storm)
+    ]
+    vpn = {r.incident_id for r, (_, text) in zip(results, storm, strict=True) if "email" not in text.lower()}
+    assert len(vpn) == 1
+    assert results[4].incident_id not in vpn and results[4].system == "email"
+    assert results[0].system == "vpn"
+    assert results[-1].reporter_count == 5
+
+
+async def test_reports_naming_no_known_system_still_merge_by_similarity() -> None:
+    model, unit_of_work = FakeModel(), FakeIncidentUnitOfWork()
+
+    async def report(report_id: str, user: str, text: str):
+        return await services.report_incident(
+            IncidentReport(report_id, UserContext(user, ["employees"]), text), model, unit_of_work, 60, 0.8
+        )
+
+    first = await report("p1", "alice", "The password reset page is down")
+    second = await report("p2", "bob", "password reset down")
+    other = await report("p3", "carol", "The salary portal is down")
+    assert first.system is None
+    assert second.incident_id == first.incident_id and second.reporter_count == 2
+    assert other.incident_id != first.incident_id

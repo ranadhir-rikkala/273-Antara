@@ -12,7 +12,7 @@ from agent.ports import (
     ToolUnitOfWork,
 )
 from agent.tools import HANDLERS, REGISTRY, schemas
-from agent.triage import CLASSIFY_PROMPT, classify_by_rules, needs_model, parse_intent
+from agent.triage import CLASSIFY_PROMPT, affected_system, classify_by_rules, needs_model, parse_intent
 from common.models import (
     ApprovalOpenRequest,
     CachedAnswer,
@@ -160,11 +160,15 @@ async def report_incident(
         existing = await workspace.find_report(report.report_id)
         if existing is not None:
             return existing
-        match = await workspace.find_similar_open(embedding, window_minutes, threshold)
+        system = affected_system(report.text)
+        if system is not None:
+            match = await workspace.find_open_for_system(system, window_minutes)
+        else:
+            match = await workspace.find_similar_open(embedding, window_minutes, threshold)
         created = match is None
         if created:
             title = report.text.strip()[:INCIDENT_TITLE_LENGTH]
-            incident_id = await workspace.open_incident(title, embedding)
+            incident_id = await workspace.open_incident(title, embedding, system)
         else:
             incident_id, title = match
         count = await workspace.add_report(report.report_id, incident_id, report.reporter.user_id, report.text)
@@ -173,7 +177,7 @@ async def report_incident(
             "incident.opened" if created else "incident.linked",
             {"incident_id": incident_id, "report_id": report.report_id},
         )
-    return IncidentResult(incident_id=incident_id, title=title, created=created, reporter_count=count)
+    return IncidentResult(incident_id=incident_id, title=title, created=created, reporter_count=count, system=system)
 
 
 def groups_key(groups: list[str]) -> str:

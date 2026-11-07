@@ -71,11 +71,15 @@ async def test_granting_access_marks_the_approved_request_granted(db) -> None:
 async def test_incidents_merge_by_vector_similarity_inside_the_lock(db) -> None:
     unit_of_work = PostgresIncidentUnitOfWork(db)
     async with unit_of_work.begin_exclusive() as workspace:
-        incident_id = await workspace.open_incident("VPN is down", vector(1))
+        incident_id = await workspace.open_incident("VPN is down", vector(1), "vpn")
+        unknown_id = await workspace.open_incident("Something odd", vector(3), None)
         assert await workspace.add_report("r1", incident_id, "alice", "VPN is down") == 1
-        assert await workspace.find_similar_open(vector(1), 60, 0.8) == (incident_id, "VPN is down")
-        assert await workspace.find_similar_open(vector(2), 60, 0.8) is None
+        assert await workspace.find_open_for_system("vpn", 60) == (incident_id, "VPN is down")
+        assert await workspace.find_open_for_system("email", 60) is None
+        assert await workspace.find_similar_open(vector(3), 60, 0.8) == (unknown_id, "Something odd")
+        assert await workspace.find_similar_open(vector(1), 60, 0.8) is None
         assert await workspace.add_report("r2", incident_id, "bob", "vpn down") == 2
+        assert await workspace.add_report("r2b", incident_id, "bob", "vpn still down") == 2
         found = await workspace.find_report("r2")
         await workspace.record("bob", "incident.linked", {"incident_id": incident_id})
     assert found.incident_id == incident_id and found.reporter_count == 2
