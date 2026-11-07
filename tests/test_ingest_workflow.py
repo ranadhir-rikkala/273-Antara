@@ -21,6 +21,7 @@ from common.queues import INGEST_CPU, INGEST_GPU
 from ingest.workflows import IngestWorkflow
 
 embedded_on_gpu: list[int] = []
+embedded_on_cpu: list[int] = []
 failed_versions: list[str] = []
 
 
@@ -44,6 +45,12 @@ async def fake_select_queue() -> str:
 @activity.defn(name=Activities.EMBED)
 async def fake_embed_gpu(batch: EmbedBatch) -> int:
     embedded_on_gpu.append(len(batch.chunk_ids))
+    return len(batch.chunk_ids)
+
+
+@activity.defn(name=Activities.EMBED)
+async def fake_embed_cpu(batch: EmbedBatch) -> int:
+    embedded_on_cpu.append(len(batch.chunk_ids))
     return len(batch.chunk_ids)
 
 
@@ -99,3 +106,26 @@ async def test_corrupt_document_is_not_retried_and_is_marked_failed() -> None:
                     task_queue=INGEST_CPU,
                 )
     assert failed_versions == ["ver-2"]
+
+
+async def test_embedding_moves_to_cpu_when_the_gpu_lane_never_picks_it_up() -> None:
+    embedded_on_gpu.clear()
+    embedded_on_cpu.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        cpu_only = Worker(
+            env.client,
+            task_queue=INGEST_CPU,
+            workflows=[IngestWorkflow],
+            activities=[fake_extract, fake_chunk, fake_select_queue, fake_embed_cpu, fake_publish, fake_mark_failed],
+        )
+        async with cpu_only:
+            result = await env.client.execute_workflow(
+                Workflows.INGEST,
+                IngestRequest("doc-3", "ver-3", "originals/doc-3/ver-3/policy.pdf", "application/pdf"),
+                id="ingest-ver-3",
+                task_queue=INGEST_CPU,
+                result_type=IngestResult,
+            )
+    assert embedded_on_gpu == []
+    assert sorted(embedded_on_cpu) == [6, 32, 32]
+    assert result.offloaded_batches == 3

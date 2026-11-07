@@ -81,6 +81,7 @@ class IngestResult:
     version_id: str
     chunk_count: int
     status: str
+    offloaded_batches: int = 0
 
 
 @dataclass
