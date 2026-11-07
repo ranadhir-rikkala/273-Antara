@@ -62,6 +62,7 @@ include = [
     "agent/tools.py",
     "agent/triage.py",
     "agent/summary.py",
+    "agent/memory.py",
     "ingest/dispatch.py",
     "api/admission.py",
     "api/auth.py",
