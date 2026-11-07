@@ -34,6 +34,14 @@ class Settings(BaseSettings):
 
     max_inflight_requests: int = 64
 
+    gateway_url: str = "http://gateway:8080"
+    prometheus_url: str = "http://prometheus:9090"
+    k8s_namespace: str = "antara"
+    chaos_enabled: bool = False
+    ops_target_url: str = "http://api:8000"
+    reconcile_every_seconds: int = 120
+    reconcile_stale_minutes: int = 5
+
     auth_mode: str = "headers"
     oidc_issuer: str = ""
     oidc_jwks_url: str = ""
