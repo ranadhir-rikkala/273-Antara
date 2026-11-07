@@ -1,3 +1,5 @@
+import re
+
 from common.models import Intent
 
 ACTION_PHRASES = (
@@ -13,21 +15,36 @@ ACTION_PHRASES = (
     "status of my ticket",
 )
 
-INCIDENT_PHRASES = (
-    " is down",
-    " are down",
-    "outage",
-    "not working",
-    "can't connect",
-    "cannot connect",
-    "unable to connect",
-    "phishing",
-    "suspicious email",
-    "suspicious link",
-    "hacked",
-    "breach",
-    "malware",
-    "ransomware",
+SECURITY_THREAT = re.compile(
+    r"phishing|suspicious (email|link|message|attachment)|\bhacked\b|\bbreach\b|malware|ransomware|\bvirus\b"
+)
+
+OUTAGE = re.compile(
+    r"\b(down|outage|offline|unreachable)\b"
+    r"|not (working|connecting|loading|responding)"
+    r"|(can't|cannot|can not|unable to|won't) (connect|log ?in|sign ?in|load|access|reach)"
+    r"|keeps? (dropping|crashing|disconnecting|freezing)"
+    r"|\bcrash(es|ed|ing)?\b"
+    r"|\b(very|really|so) slow\b"
+)
+
+QUESTION_START = re.compile(r"^\s*(how|what|who|when|where|why|which|should|does|do)\b")
+
+BROKEN_DEVICE = re.compile(
+    r"\bmy (laptop|keyboard|mouse|monitor|screen|phone|headset|webcam|charger)\b"
+    r".*\b(broken|cracked|dead|damaged|not working|won't turn on)\b"
+)
+
+SYSTEMS = (
+    ("vpn", re.compile(r"\bvpn\b")),
+    ("email", re.compile(r"\b(e-?mail|outlook|mailbox|gmail)\b")),
+    ("wifi", re.compile(r"\b(wi-?fi|wireless)\b")),
+    ("sso", re.compile(r"\b(sso|okta|single sign-?on|log ?in|sign ?in)\b")),
+    ("printer", re.compile(r"\b(printer|printing)\b")),
+    ("internet", re.compile(r"\binternet\b")),
+    ("slack", re.compile(r"\bslack\b")),
+    ("jira", re.compile(r"\bjira\b")),
+    ("database", re.compile(r"\b(database|db)\b")),
 )
 
 REQUEST_MARKERS = (
@@ -60,11 +77,21 @@ CLASSIFY_PROMPT = (
 
 def classify_by_rules(text: str) -> Intent:
     lowered = f" {text.lower()} "
-    if any(phrase in lowered for phrase in ACTION_PHRASES):
+    if any(phrase in lowered for phrase in ACTION_PHRASES) or BROKEN_DEVICE.search(lowered):
         return Intent.ACTION
-    if any(phrase in lowered for phrase in INCIDENT_PHRASES):
+    if SECURITY_THREAT.search(lowered):
+        return Intent.INCIDENT
+    if OUTAGE.search(lowered) and not QUESTION_START.match(lowered):
         return Intent.INCIDENT
     return Intent.QUESTION
+
+
+def affected_system(text: str) -> str | None:
+    lowered = text.lower()
+    for name, pattern in SYSTEMS:
+        if pattern.search(lowered):
+            return name
+    return None
 
 
 def needs_model(text: str, by_rules: Intent) -> bool:

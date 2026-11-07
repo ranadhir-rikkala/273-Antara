@@ -1,4 +1,4 @@
-from agent.triage import classify_by_rules, needs_model, parse_intent, tools_for
+from agent.triage import affected_system, classify_by_rules, needs_model, parse_intent, tools_for
 from common.models import Intent
 
 
@@ -27,3 +27,35 @@ def test_requests_are_narrowed_to_the_matching_tool() -> None:
     assert tools_for("What is the status of my ticket 42?") == ["get_ticket_status"]
     assert tools_for("Please create a ticket, my screen does not lock") == ["create_ticket"]
     assert tools_for("Can you help me with something?") is None
+
+
+def test_every_report_from_the_live_storm_is_an_incident() -> None:
+    for report in (
+        "The VPN is down",
+        "vpn not connecting",
+        "VPN down for me too",
+        "cannot connect to VPN",
+        "Is the VPN down?",
+        "VPN outage again",
+        "Email is down",
+        "wifi keeps dropping",
+    ):
+        assert classify_by_rules(report) == Intent.INCIDENT, report
+
+
+def test_questions_about_outages_and_downloads_stay_questions() -> None:
+    assert classify_by_rules("How do I download the VPN client?") == Intent.QUESTION
+    assert classify_by_rules("What should I do if the VPN is down?") == Intent.QUESTION
+
+
+def test_a_broken_personal_device_is_a_ticket_not_an_incident() -> None:
+    assert classify_by_rules("My laptop screen is broken") == Intent.ACTION
+    assert tools_for("My laptop screen is broken") == ["create_ticket"]
+
+
+def test_affected_system_is_named_consistently() -> None:
+    assert affected_system("The VPN is down") == "vpn"
+    assert affected_system("cannot connect to vpn") == "vpn"
+    assert affected_system("Outlook keeps crashing") == "email"
+    assert affected_system("wi-fi keeps dropping") == "wifi"
+    assert affected_system("something is weird") is None
