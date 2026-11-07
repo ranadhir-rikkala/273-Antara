@@ -37,6 +37,8 @@ with workflow.unsafe.imports_passed_through():
 
 MAX_STEPS = 6
 ESCALATE_AFTER = timedelta(minutes=2)
+EXPIRE_AFTER = timedelta(hours=24)
+APPROVED, DENIED, EXPIRED = "approved", "denied", "expired"
 UNAVAILABLE_ANSWER = "The assistant is temporarily unavailable. Please try again in a minute."
 
 
@@ -137,10 +139,18 @@ class AgentRunWorkflow:
                     f"You are not allowed to use {turn.tool_call.name}. Ask your manager or the IT helpdesk."
                 )
                 return self._state
-            if turn.tool_call.requires_approval and not await self._await_approval(request, turn.tool_call, step):
-                self._state.status = RunStatus.DENIED
-                self._state.answer = "Your request was denied by an approver."
-                return self._state
+            if turn.tool_call.requires_approval:
+                outcome = await self._await_approval(request, turn.tool_call, step)
+                if outcome == DENIED:
+                    self._state.status = RunStatus.DENIED
+                    self._state.answer = "Your request was denied by an approver."
+                    return self._state
+                if outcome == EXPIRED:
+                    self._state.status = RunStatus.EXPIRED
+                    self._state.answer = (
+                        "Your request expired after 24 hours without a decision. Ask again if you still need it."
+                    )
+                    return self._state
             self._state.status = RunStatus.RUNNING
             self._running_tool = turn.tool_call.name
             result = await workflow.execute_activity(
@@ -187,7 +197,7 @@ class AgentRunWorkflow:
         self._state.status = RunStatus.COMPLETED
         return self._state
 
-    async def _await_approval(self, request: AgentRunRequest, call: ToolCall, step: int) -> bool:
+    async def _await_approval(self, request: AgentRunRequest, call: ToolCall, step: int) -> str:
         run_id = workflow.info().workflow_id
         self._state.approval_id = await workflow.execute_activity(
             Activities.OPEN_APPROVAL,
@@ -210,11 +220,21 @@ class AgentRunWorkflow:
                 start_to_close_timeout=timedelta(seconds=30),
                 retry_policy=DEFAULT_RETRY,
             )
-            await workflow.wait_condition(lambda: self._decision is not None)
+            try:
+                await workflow.wait_condition(lambda: self._decision is not None, timeout=EXPIRE_AFTER - ESCALATE_AFTER)
+            except TimeoutError:
+                await workflow.execute_activity(
+                    Activities.EXPIRE_APPROVAL,
+                    self._state.approval_id,
+                    task_queue=TOOLS,
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=DEFAULT_RETRY,
+                )
+                return EXPIRED
         approved = self._decision.approved
         self._approved_by = self._decision.approver_id
         self._decision = None
-        return approved
+        return APPROVED if approved else DENIED
 
     @workflow.signal(name=Signals.APPROVAL)
     def approval(self, decision: ApprovalDecision) -> None:

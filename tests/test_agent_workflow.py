@@ -33,6 +33,7 @@ from common.queues import AGENT, TOOLS
 executed: list[str] = []
 tool_offers: list[bool] = []
 escalations: list[str] = []
+expirations: list[str] = []
 opened_approvals: list[str] = []
 failing_tools: list[bool] = []
 failing_model: list[bool] = []
@@ -101,6 +102,11 @@ async def fake_open_approval(request: ApprovalOpenRequest) -> str:
     return f"approval-for-{request.approval_key}"
 
 
+@activity.defn(name=Activities.EXPIRE_APPROVAL)
+async def fake_expire_approval(approval_id: str) -> None:
+    expirations.append(approval_id)
+
+
 @activity.defn(name=Activities.ESCALATE_APPROVAL)
 async def fake_escalate_approval(approval_id: str) -> None:
     escalations.append(approval_id)
@@ -128,7 +134,13 @@ def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
             env.client,
             task_queue=TOOLS,
             workflows=[IncidentReportWorkflow],
-            activities=[fake_execute_tool, fake_open_approval, fake_escalate_approval, fake_report_incident],
+            activities=[
+                fake_execute_tool,
+                fake_open_approval,
+                fake_escalate_approval,
+                fake_expire_approval,
+                fake_report_incident,
+            ],
         ),
     )
 
@@ -275,4 +287,17 @@ async def test_forbidden_actions_are_refused_before_any_approval_is_opened() -> 
     assert result.status == RunStatus.DENIED
     assert "not allowed" in result.answer
     assert opened_approvals == []
+    assert executed == []
+
+
+async def test_an_undecided_request_expires_after_a_day_without_running_the_tool() -> None:
+    executed.clear()
+    expirations.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            result = await (await _run(env, "agent-expire", "I need access to prod-db please")).result()
+    assert result.status == RunStatus.EXPIRED
+    assert "expired" in result.answer
+    assert expirations == ["approval-for-agent-expire:0"]
     assert executed == []
