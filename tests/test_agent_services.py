@@ -257,3 +257,11 @@ async def test_expiring_an_approval_is_audited() -> None:
     await services.expire_approval("approval-9", store, audit)
     assert store.expired == ["approval-9"]
     assert audit.entries == [("system", "approval.expired", {"approval_id": "approval-9"})]
+
+
+def test_previous_turns_are_sent_to_the_model_before_the_new_question() -> None:
+    from common.models import ConversationTurn
+
+    request = GenerateRequest("and for write?", [VPN_CHUNK], history=[ConversationTurn("read access?", "Manager [1]")])
+    roles = [message["role"] for message in services.build_messages(request)]
+    assert roles == ["system", "user", "assistant", "user"]

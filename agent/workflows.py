@@ -31,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
     from common.retry import DEFAULT_RETRY
 
 with workflow.unsafe.imports_passed_through():
+    from agent.memory import contextual_query, recent
     from agent.summary import summarize_tool_result
     from agent.tools import may_use
     from agent.triage import tools_for
@@ -68,6 +69,9 @@ class AgentRunWorkflow:
             return self._state
 
     async def _handle(self, request: AgentRunRequest) -> AgentRunState:
+        history = recent(request.history)
+        query = contextual_query(request.question, history)
+        contextual = query != request.question
         self._state.intent = await workflow.execute_activity(
             Activities.CLASSIFY,
             request.question,
@@ -78,7 +82,7 @@ class AgentRunWorkflow:
         )
         if self._state.intent == Intent.INCIDENT:
             return await self._report_incident(request)
-        if self._state.intent == Intent.QUESTION:
+        if self._state.intent == Intent.QUESTION and not contextual:
             cached = await workflow.execute_activity(
                 Activities.CACHE_LOOKUP,
                 CacheLookupRequest(question=request.question, user=request.user),
@@ -95,7 +99,7 @@ class AgentRunWorkflow:
                 return self._state
         chunks = await workflow.execute_activity(
             Activities.RETRIEVE,
-            RetrieveRequest(query=request.question, user=request.user),
+            RetrieveRequest(query=query, user=request.user),
             result_type=list[ChunkResult],
             task_queue=AGENT,
             start_to_close_timeout=timedelta(minutes=1),
@@ -112,6 +116,7 @@ class AgentRunWorkflow:
                     tool_results=tool_results,
                     allow_tools=self._state.intent == Intent.ACTION,
                     tool_names=tools_for(request.question),
+                    history=history,
                 ),
                 result_type=ModelTurn,
                 task_queue=AGENT,
@@ -122,7 +127,7 @@ class AgentRunWorkflow:
                 self._state.answer = turn.answer
                 self._state.needs_input = turn.needs_input
                 self._state.status = RunStatus.COMPLETED
-                if self._should_cache(chunks, tool_results, turn.answer):
+                if not contextual and self._should_cache(chunks, tool_results, turn.answer):
                     await workflow.execute_activity(
                         Activities.CACHE_STORE,
                         CacheStoreRequest(

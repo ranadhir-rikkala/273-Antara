@@ -301,3 +301,25 @@ async def test_an_undecided_request_expires_after_a_day_without_running_the_tool
     assert "expired" in result.answer
     assert expirations == ["approval-for-agent-expire:0"]
     assert executed == []
+
+
+async def test_follow_ups_search_with_context_and_skip_the_cache() -> None:
+    from common.models import ConversationTurn
+
+    retrievals.clear()
+    cache.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            history = [ConversationTurn("Who approves read access to production databases?", "The manager [1]")]
+            handle = await env.client.start_workflow(
+                Workflows.AGENT_RUN,
+                AgentRunRequest("and what about write access?", UserContext("alice", ["employees"]), history=history),
+                id="agent-follow-up",
+                task_queue=AGENT,
+                result_type=AgentRunState,
+            )
+            result = await handle.result()
+    assert retrievals == ["Who approves read access to production databases? and what about write access?"]
+    assert result.status == RunStatus.COMPLETED
+    assert cache == {}

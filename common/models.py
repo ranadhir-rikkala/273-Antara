@@ -29,6 +29,12 @@ class RunStatus(StrEnum):
 
 
 @dataclass
+class ConversationTurn:
+    question: str
+    answer: str
+
+
+@dataclass
 class UserContext:
     user_id: str
     groups: list[str] = field(default_factory=list)
@@ -113,6 +119,7 @@ class GenerateRequest:
     tool_results: list[dict[str, Any]] = field(default_factory=list)
     allow_tools: bool = True
     tool_names: list[str] | None = None
+    history: list[ConversationTurn] = field(default_factory=list)
 
 
 @dataclass
@@ -134,6 +141,7 @@ class ToolResult:
 class AgentRunRequest:
     question: str
     user: UserContext
+    history: list[ConversationTurn] = field(default_factory=list)
 
 
 @dataclass

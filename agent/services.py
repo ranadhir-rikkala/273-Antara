@@ -72,10 +72,13 @@ async def classify(question: str, model: ChatModel) -> Intent:
 
 def build_messages(request: GenerateRequest) -> list[dict[str, Any]]:
     context = "\n\n".join(f"[{index}] {chunk.text}" for index, chunk in enumerate(request.chunks, start=1))
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Context:\n{context or 'No passages found.'}\n\nQuestion: {request.question}"},
-    ]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in request.history:
+        messages.append({"role": "user", "content": turn.question})
+        messages.append({"role": "assistant", "content": turn.answer})
+    messages.append(
+        {"role": "user", "content": f"Context:\n{context or 'No passages found.'}\n\nQuestion: {request.question}"}
+    )
     if request.tool_results:
         messages.append(
             {"role": "user", "content": f"Tool results so far: {json.dumps(request.tool_results)}. Reply to the user."}
