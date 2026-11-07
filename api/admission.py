@@ -61,20 +61,24 @@ class LoadGate:
         self._read = read
         self._refresh_seconds = refresh_seconds
         self._value = 0
+        self._admitted_since_read = 0
         self._checked_at = float("-inf")
 
     async def admit(self) -> None:
         if time.monotonic() - self._checked_at >= self._refresh_seconds:
             self._value = await self._read()
+            self._admitted_since_read = 0
             self._checked_at = time.monotonic()
-        if self._value > self.limit:
+        load = self._value + self._admitted_since_read
+        if load >= self.limit:
             self.rejected += 1
             REJECTED.labels(self.name).inc()
             raise HTTPException(
                 status_code=429,
-                detail=f"{self._value} documents are still being processed; try again shortly",
-                headers={"Retry-After": str(retry_after_seconds(self._value, self.limit))},
+                detail=f"{load} documents are still being processed; try again shortly",
+                headers={"Retry-After": str(retry_after_seconds(load + 1, self.limit))},
             )
+        self._admitted_since_read += 1
 
 
 class InflightLimit:

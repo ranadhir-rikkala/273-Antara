@@ -89,3 +89,17 @@ async def test_load_gate_rejects_when_too_much_work_is_in_flight() -> None:
     in_flight["documents"] = 10
     await gate.admit()
     assert gate.rejected == 1
+
+
+async def test_load_gate_counts_its_own_admissions_so_a_burst_cannot_slip_through() -> None:
+    from api.admission import LoadGate
+
+    async def read() -> int:
+        return 0
+
+    gate = LoadGate("documents-in-flight", limit=5, read=read, refresh_seconds=60)
+    for _ in range(5):
+        await gate.admit()
+    with pytest.raises(HTTPException):
+        await gate.admit()
+    assert gate.rejected == 1
