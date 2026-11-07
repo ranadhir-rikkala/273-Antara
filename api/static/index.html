@@ -242,6 +242,7 @@ function renderBot(node, state) {
   if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
   if (state.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
   if (state.needs_input) meta.append(el("span", { class: "chip warn" }, "needs details"));
+  for (const flag of state.flags || []) meta.append(el("span", { class: "chip warn" }, `guard: ${flag.replaceAll("-", " ")}`));
   if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
   for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
   node.append(meta);
