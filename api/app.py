@@ -15,11 +15,12 @@ from api import services
 from api.admission import BacklogGate, InflightLimit
 from api.auth import current_user
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
+from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
 from common import storage
 from common.config import settings
 from common.db import pool
-from common.models import AgentRunRequest, AgentRunState, ApprovalDecision, UserContext
-from common.names import Queries, Signals, Workflows
+from common.models import AgentRunRequest, ApprovalDecision, UserContext
+from common.names import Signals, Workflows
 from common.queues import AGENT, INGEST_CPU
 from common.storage import S3ObjectStore
 from common.temporal_client import connect
@@ -158,8 +159,12 @@ async def start_run(
 
 @app.get("/agent/runs/{run_id}")
 async def get_run(run_id: str, client: Client = Depends(temporal)) -> dict[str, object]:
-    handle = client.get_workflow_handle(run_id)
-    state = await handle.query(Queries.STATE, result_type=AgentRunState)
+    try:
+        state = await read_run_state(client.get_workflow_handle(run_id))
+    except RunNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except RunUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error), headers={"Retry-After": "5"}) from error
     return {"run_id": run_id, **asdict(state)}
 
 

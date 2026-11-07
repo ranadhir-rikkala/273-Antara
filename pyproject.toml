@@ -65,6 +65,7 @@ include = [
     "ingest/dispatch.py",
     "api/admission.py",
     "api/auth.py",
+    "api/runs.py",
 ]
 fail_under = 100
 show_missing = true
