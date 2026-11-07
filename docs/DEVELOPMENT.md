@@ -57,13 +57,32 @@ curl localhost:8000/approvals -H 'X-User-Id: carol' -H 'X-User-Groups: managers'
 python -m loadtest.burst --docs 200 --questions 50 --concurrency 50
 ```
 
-## Checks
+## Local Kubernetes (the demo setup, $0)
+
+Kubernetes runs inside Docker, so nothing extra is installed on your machine. Give Docker at least 6 CPUs and 8 GB first (Colima: `colima start --cpu 6 --memory 8`).
 
 ```bash
-scripts/check.sh
+docker compose -f deploy/local/docker-compose.yml up -d
+export KUBECONFIG=$PWD/deploy/local/.kube/kubeconfig.yaml
+kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.17.2/keda-2.17.2.yaml
+scripts/local-deploy.sh
+kubectl -n antara exec deploy/ollama -- ollama pull qwen2.5:1.5b
+kubectl -n antara exec deploy/ollama -- ollama pull nomic-embed-text
 ```
 
-It runs ruff and pytest in a Python 3.12 container. Workflow tests use Temporal's time-skipping test server and need no running stack.
+The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
+
+## Checks
+
+Read [AGENTS.md](../AGENTS.md) first: services hold the rules, adapters hold the I/O, and every change is test-first.
+
+| Command | What it proves | Needs |
+| --- | --- | --- |
+| `scripts/check.sh` | Lint, format, unit and workflow tests, 100% coverage of business logic | Docker |
+| `scripts/integration.sh` | Every Postgres adapter against a real pgvector database | Docker |
+| `python -m evals.run` | Model behaviour: right answers, right citations, no leaks, no invented confirmations | A running stack with models |
+
+The eval suite must stay at 100%. When you find a new hallucination, add a case to `evals/cases.json` that reproduces it, watch it fail, then fix the harness.
 
 ## Frozen contracts
 
