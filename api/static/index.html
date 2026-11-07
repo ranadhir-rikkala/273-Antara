@@ -43,6 +43,9 @@
   .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); font-size: 12px; }
   .chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
   .cite { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; margin-top: 6px; }
+  .cite.strong { color: var(--ink); border-left-color: var(--accent); }
+  .sources { margin-top: 8px; }
+  .sources summary { cursor: pointer; font-size: 12px; color: var(--accent); width: fit-content; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { color: var(--muted); font-weight: 500; }
@@ -106,6 +109,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(["COMPLETED", "DENIED", "FAILED"]);
+const STRONG_MATCH = 0.6;
 
 const auth = { mode: "headers", issuer: "", clientId: "", token: null, refresh: null, claims: null };
 
@@ -238,9 +242,17 @@ function renderBot(node, state) {
   if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
   for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
   node.append(meta);
-  (state.citations || []).forEach((cite, index) => {
-    node.append(el("div", { class: "cite" }, `[${index + 1}] p.${cite.page_number} · ${cite.text.slice(0, 180)}${cite.text.length > 180 ? "…" : ""}`));
+  const citations = state.citations || [];
+  if (!citations.length) return;
+  const strong = citations.filter((cite) => cite.score >= STRONG_MATCH).length;
+  const sources = el("details", { class: "sources" },
+    el("summary", {}, strong ? `Sources (${strong} strong match${strong > 1 ? "es" : ""}, ${citations.length - strong} related)` : `Sources (${citations.length} related)`));
+  citations.forEach((cite, index) => {
+    const label = cite.score >= STRONG_MATCH ? "strong match" : "related";
+    sources.append(el("div", { class: `cite ${cite.score >= STRONG_MATCH ? "strong" : ""}` },
+      `[${index + 1}] ${label} · p.${cite.page_number} · ${cite.text.slice(0, 180)}${cite.text.length > 180 ? "…" : ""}`));
   });
+  node.append(sources);
 }
 
 async function poll(runId, node) {
