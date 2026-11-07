@@ -23,11 +23,18 @@ class LLMProvider:
         self._embedding_model = embedding_model or settings.embedding_model
 
     async def generate(self, messages: list[dict[str, Any]]) -> str:
-        data = await self._post("/chat/completions", {"model": self._model, "messages": messages})
+        payload = {"model": self._model, "messages": messages, "temperature": settings.llm_temperature}
+        data = await self._post("/chat/completions", payload)
         return data["choices"][0]["message"].get("content") or ""
 
     async def generate_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
-        payload = {"model": self._model, "messages": messages, "tools": tools, "tool_choice": "auto"}
+        payload = {
+            "model": self._model,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+            "temperature": settings.llm_temperature,
+        }
         data = await self._post("/chat/completions", payload)
         return data["choices"][0]["message"]
 
