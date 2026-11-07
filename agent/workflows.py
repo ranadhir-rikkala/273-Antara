@@ -126,6 +126,7 @@ class AgentRunWorkflow:
             if turn.tool_call is None:
                 self._state.answer = turn.answer
                 self._state.needs_input = turn.needs_input
+                self._state.flags = turn.flags
                 self._state.status = RunStatus.COMPLETED
                 if not contextual and self._should_cache(chunks, tool_results, turn.answer):
                     await workflow.execute_activity(

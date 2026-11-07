@@ -110,6 +110,7 @@ class ModelTurn:
     answer: str | None = None
     tool_call: ToolCall | None = None
     needs_input: bool = False
+    flags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -207,6 +208,7 @@ class AgentRunState:
     incident: IncidentResult | None = None
     cached: bool = False
     needs_input: bool = False
+    flags: list[str] = field(default_factory=list)
 
 
 @dataclass
