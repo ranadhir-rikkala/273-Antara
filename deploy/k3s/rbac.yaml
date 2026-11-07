@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: antara-api
+  namespace: antara
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: antara-ops
+  namespace: antara
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, delete]
+  - apiGroups: [keda.sh]
+    resources: [scaledobjects]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: antara-ops
+  namespace: antara
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: antara-ops}
+subjects:
+  - {kind: ServiceAccount, name: antara-api, namespace: antara}

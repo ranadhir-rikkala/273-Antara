@@ -20,6 +20,7 @@ spec:
       labels: {app: api, antara/part: app}
       annotations: {prometheus.io/scrape: "true", prometheus.io/port: "8000"}
     spec:
+      serviceAccountName: antara-api
       containers:
         - name: api
           image: antara-app:dev

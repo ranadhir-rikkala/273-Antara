@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - config.yaml
+  - rbac.yaml
   - data.yaml
   - temporal.yaml
   - gpu.yaml
