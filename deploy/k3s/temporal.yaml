@@ -53,6 +53,7 @@ spec:
   template:
     metadata: {labels: {app: temporal-ui}}
     spec:
+      enableServiceLinks: false
       containers:
         - name: ui
           image: temporalio/ui:2.31.2
