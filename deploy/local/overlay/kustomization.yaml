@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../k3s
+  - ollama.yaml
+patches:
+  - target: {kind: DaemonSet, name: nvidia-device-plugin}
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata: {name: nvidia-device-plugin, namespace: kube-system}
+  - target: {kind: ConfigMap, name: nvidia-time-slicing}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: {name: nvidia-time-slicing, namespace: kube-system}
+  - target: {kind: RuntimeClass, name: nvidia}
+    patch: |-
+      $patch: delete
+      apiVersion: node.k8s.io/v1
+      kind: RuntimeClass
+      metadata: {name: nvidia}
+  - target: {kind: Deployment, name: "vllm|tei-gpu|tei-cpu"}
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: ignored}
+  - target: {kind: Service, name: "vllm|tei-gpu|tei-cpu"}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: {name: ignored}
+  - target: {kind: NetworkPolicy}
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata: {name: ignored}
+  - target: {kind: ConfigMap, name: antara-config}
+    patch: |-
+      - {op: replace, path: /data/LLM_MODEL, value: "qwen2.5:1.5b"}
+      - {op: replace, path: /data/EMBEDDING_MODEL, value: "nomic-embed-text"}
+  - target: {kind: Deployment, name: gateway}
+    patch: |-
+      - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama:11434/v1"}
+      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://ollama:11434/v1"}
+  - target: {kind: Deployment, name: ingest-cpu}
+    patch: |-
+      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://ollama:11434/v1"}
+  - target: {kind: Deployment, name: ingest-gpu}
+    patch: |-
+      - {op: remove, path: /spec/template/spec/nodeSelector}
+      - {op: remove, path: /spec/template/spec/tolerations}
