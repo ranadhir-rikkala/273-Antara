@@ -1,0 +1,79 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ingest-cpu
+  namespace: antara
+spec:
+  scaleTargetRef: {name: ingest-cpu}
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  pollingInterval: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: temporal
+      metadata:
+        endpoint: temporal-frontend.antara.svc.cluster.local:7233
+        namespace: default
+        taskQueue: ingest-cpu
+        queueTypes: activity
+        targetQueueSize: "10"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ingest-gpu
+  namespace: antara
+spec:
+  scaleTargetRef: {name: ingest-gpu}
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  pollingInterval: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: temporal
+      metadata:
+        endpoint: temporal-frontend.antara.svc.cluster.local:7233
+        namespace: default
+        taskQueue: ingest-gpu
+        queueTypes: activity
+        targetQueueSize: "20"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent
+  namespace: antara
+spec:
+  scaleTargetRef: {name: agent}
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: temporal
+      metadata:
+        endpoint: temporal-frontend.antara.svc.cluster.local:7233
+        namespace: default
+        taskQueue: agent
+        queueTypes: workflow,activity
+        targetQueueSize: "5"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: tools
+  namespace: antara
+spec:
+  scaleTargetRef: {name: tools}
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: temporal
+      metadata:
+        endpoint: temporal-frontend.antara.svc.cluster.local:7233
+        namespace: default
+        taskQueue: tools
+        queueTypes: workflow,activity
+        targetQueueSize: "10"
