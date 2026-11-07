@@ -44,6 +44,9 @@ patches:
     patch: |-
       - {op: replace, path: /data/LLM_MODEL, value: "qwen2.5:1.5b"}
       - {op: replace, path: /data/EMBEDDING_MODEL, value: "nomic-embed-text"}
+      - {op: add, path: /data/CHAOS_ENABLED, value: "true"}
+      - {op: add, path: /data/RECONCILE_EVERY_SECONDS, value: "30"}
+      - {op: add, path: /data/RECONCILE_STALE_MINUTES, value: "1"}
   - target: {kind: Deployment, name: gateway}
     patch: |-
       - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama:11434/v1"}
