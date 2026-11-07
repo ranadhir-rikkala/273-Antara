@@ -84,7 +84,7 @@ async def fake_generate(request: GenerateRequest) -> ModelTurn:
 @activity.defn(name=Activities.EXECUTE_TOOL)
 async def fake_execute_tool(request: ToolRequest) -> ToolResult:
     executed.append(request.idempotency_key)
-    return ToolResult(request.idempotency_key, "COMPLETED", {"approval_id": "approval-1"})
+    return ToolResult(request.idempotency_key, "COMPLETED", {"system": "prod-db", "role": "read", "status": "GRANTED"})
 
 
 @activity.defn(name=Activities.OPEN_APPROVAL)
@@ -152,6 +152,7 @@ async def test_access_request_escalates_then_runs_tool_once_after_approval() -> 
             result = await handle.result()
     assert result.status == RunStatus.COMPLETED
     assert result.escalated is True
+    assert result.answer == "Your read access to prod-db was granted after manager-1 approved it."
     assert executed == ["agent-approve:0"]
 
 

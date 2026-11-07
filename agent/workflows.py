@@ -29,6 +29,9 @@ with workflow.unsafe.imports_passed_through():
     from common.queues import AGENT, TOOLS
     from common.retry import DEFAULT_RETRY
 
+with workflow.unsafe.imports_passed_through():
+    from agent.summary import summarize_tool_result
+
 MAX_STEPS = 6
 ESCALATE_AFTER = timedelta(minutes=2)
 
@@ -38,6 +41,7 @@ class AgentRunWorkflow:
     def __init__(self) -> None:
         self._state = AgentRunState(status=RunStatus.RUNNING)
         self._decision: ApprovalDecision | None = None
+        self._approved_by: str | None = None
 
     @workflow.run
     async def run(self, request: AgentRunRequest) -> AgentRunState:
@@ -122,7 +126,9 @@ class AgentRunWorkflow:
                 retry_policy=DEFAULT_RETRY,
             )
             self._state.tool_results.append(result)
-            tool_results.append({"tool": turn.tool_call.name, "status": result.status, "output": result.output})
+            self._state.answer = summarize_tool_result(turn.tool_call.name, result.output, self._approved_by)
+            self._state.status = RunStatus.COMPLETED
+            return self._state
         self._state.status = RunStatus.FAILED
         return self._state
 
@@ -175,6 +181,7 @@ class AgentRunWorkflow:
             )
             await workflow.wait_condition(lambda: self._decision is not None)
         approved = self._decision.approved
+        self._approved_by = self._decision.approver_id
         self._decision = None
         return approved
 
