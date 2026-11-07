@@ -25,7 +25,7 @@ async def test_upload_stores_the_file_and_registers_the_document() -> None:
 
 
 async def test_inbox_visibility_depends_on_role() -> None:
-    inbox = FakeInbox({"a1": ("run-1", "PENDING", False), "a2": ("run-2", "PENDING", True)})
+    inbox = FakeInbox({"a1": ("run-1", "PENDING", False, "alice"), "a2": ("run-2", "PENDING", True, "alice")})
     assert len(await services.approvals_for(CAROL, inbox)) == 2
     assert [row["approval_id"] for row in await services.approvals_for(DAVE, inbox)] == ["a2"]
     with pytest.raises(services.ForbiddenError):
@@ -33,7 +33,7 @@ async def test_inbox_visibility_depends_on_role() -> None:
 
 
 async def test_managers_decide_and_security_leads_only_after_escalation() -> None:
-    inbox = FakeInbox({"a1": ("run-1", "PENDING", False), "a2": ("run-2", "PENDING", True)})
+    inbox = FakeInbox({"a1": ("run-1", "PENDING", False, "alice"), "a2": ("run-2", "PENDING", True, "alice")})
     with pytest.raises(services.ForbiddenError):
         await services.decide("a1", DAVE, True, inbox)
     outcome = await services.decide("a2", DAVE, True, inbox)
@@ -43,8 +43,15 @@ async def test_managers_decide_and_security_leads_only_after_escalation() -> Non
 
 
 async def test_missing_or_already_decided_approvals_are_rejected() -> None:
-    inbox = FakeInbox({"a1": ("run-1", "APPROVED", False)})
+    inbox = FakeInbox({"a1": ("run-1", "APPROVED", False, "alice")})
     with pytest.raises(services.NotFoundError):
         await services.decide("nope", CAROL, True, inbox)
     with pytest.raises(services.ConflictError):
         await services.decide("a1", CAROL, True, inbox)
+
+
+async def test_nobody_can_approve_their_own_request() -> None:
+    inbox = FakeInbox({"a1": ("run-1", "PENDING", False, "carol")})
+    with pytest.raises(services.ForbiddenError, match="own"):
+        await services.decide("a1", CAROL, True, inbox)
+    assert inbox.rows["a1"][1] == "PENDING"

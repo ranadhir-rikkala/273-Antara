@@ -97,14 +97,14 @@ class _DecisionWorkspace:
     def __init__(self, conn: AsyncConnection) -> None:
         self._conn = conn
 
-    async def lock(self, approval_id: str) -> tuple[str, str, bool] | None:
+    async def lock(self, approval_id: str) -> tuple[str, str, bool, str] | None:
         row = await (
             await self._conn.execute(
-                "SELECT run_id, status, escalated FROM approvals WHERE approval_id::text = %s FOR UPDATE",
+                "SELECT run_id, status, escalated, requester_id FROM approvals WHERE approval_id::text = %s FOR UPDATE",
                 (approval_id,),
             )
         ).fetchone()
-        return None if row is None else (row[0], row[1], row[2])
+        return None if row is None else (row[0], row[1], row[2], row[3])
 
     async def record(self, approval_id: str, approver_id: str, approved: bool) -> None:
         await self._conn.execute(

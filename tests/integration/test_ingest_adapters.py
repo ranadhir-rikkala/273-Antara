@@ -98,7 +98,7 @@ async def test_approval_inbox_lists_and_records_decisions(db) -> None:
     inbox = PostgresApprovalInbox(db)
     assert [row["approval_id"] for row in await inbox.pending(escalated_only=True)] == [approval_id]
     async with inbox.begin() as workspace:
-        assert await workspace.lock(approval_id) == ("run-9", "PENDING", True)
+        assert await workspace.lock(approval_id) == ("run-9", "PENDING", True, "alice")
         assert await workspace.lock("missing") is None
         await workspace.record(approval_id, "dave", True)
     assert await inbox.pending(escalated_only=False) == []

@@ -77,9 +77,11 @@ async def decide(approval_id: str, user: UserContext, approved: bool, inbox: App
         row = await workspace.lock(approval_id)
         if row is None:
             raise NotFoundError("Approval not found")
-        run_id, status, escalated = row
+        run_id, status, escalated, requester_id = row
         if status != "PENDING":
             raise ConflictError(f"Approval is already {status}")
+        if requester_id == user.user_id:
+            raise ForbiddenError("You cannot approve your own request")
         if not can_decide(user, escalated):
             raise ForbiddenError("You cannot decide this approval")
         await workspace.record(approval_id, user.user_id, approved)

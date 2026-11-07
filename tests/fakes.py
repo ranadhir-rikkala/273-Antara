@@ -366,17 +366,17 @@ class _DecisionWorkspace:
     def __init__(self, inbox: "FakeInbox") -> None:
         self._inbox = inbox
 
-    async def lock(self, approval_id: str) -> tuple[str, str, bool] | None:
+    async def lock(self, approval_id: str) -> tuple[str, str, bool, str] | None:
         return self._inbox.rows.get(approval_id)
 
     async def record(self, approval_id: str, approver_id: str, approved: bool) -> None:
-        run_id, _, escalated = self._inbox.rows[approval_id]
-        self._inbox.rows[approval_id] = (run_id, "APPROVED" if approved else "DENIED", escalated)
+        run_id, _, escalated, requester = self._inbox.rows[approval_id]
+        self._inbox.rows[approval_id] = (run_id, "APPROVED" if approved else "DENIED", escalated, requester)
         self._inbox.decided_by[approval_id] = approver_id
 
 
 class FakeInbox:
-    def __init__(self, rows: dict[str, tuple[str, str, bool]] | None = None) -> None:
+    def __init__(self, rows: dict[str, tuple[str, str, bool, str]] | None = None) -> None:
         self.rows = rows or {}
         self.decided_by: dict[str, str] = {}
         self.pending_queries: list[bool] = []
@@ -385,7 +385,7 @@ class FakeInbox:
         self.pending_queries.append(escalated_only)
         return [
             {"approval_id": key, "escalated": escalated}
-            for key, (_, status, escalated) in self.rows.items()
+            for key, (_, status, escalated, _requester) in self.rows.items()
             if status == "PENDING" and (escalated or not escalated_only)
         ]
 
