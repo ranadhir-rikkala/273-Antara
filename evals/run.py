@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 
 CASES = Path(__file__).with_name("cases.json")
+FIXTURES = Path(__file__).with_name("fixtures")
+FIXTURE_GROUPS = "employees,contractors,managers"
 RESULTS = Path(__file__).with_name("results")
 SETTLED = {"COMPLETED", "DENIED", "FAILED", "WAITING_APPROVAL", "ESCALATED"}
 CITATION_MARK = re.compile(r"\[(\d+)\]")
@@ -29,6 +31,8 @@ class Outcome:
 
 def check(case: dict[str, Any], state: dict[str, Any], titles: dict[str, str]) -> list[str]:
     expect = case["expect"]
+    if "http" in expect:
+        return [] if state.get("http") == expect["http"] else [f"http {state.get('http', 202)} != {expect['http']}"]
     answer = (state.get("answer") or "").lower()
     cited = [titles.get(c["document_id"], c["document_id"]) for c in state.get("citations", [])]
     tools = state.get("tool_results", [])
@@ -67,12 +71,37 @@ def check(case: dict[str, Any], state: dict[str, Any], titles: dict[str, str]) -
 def run_case(client: httpx.Client, case: dict[str, Any], timeout: float) -> tuple[dict[str, Any], float]:
     headers = {"X-User-Id": case["user"], "X-User-Groups": case["groups"]}
     started = time.perf_counter()
-    run_id = client.post("/agent/runs", json={"question": case["question"]}, headers=headers).json()["run_id"]
+    body = {"question": case["question"], "history": case.get("history", [])}
+    response = client.post("/agent/runs", json=body, headers=headers)
+    if response.status_code != 202:
+        return {"http": response.status_code, "status": None}, time.perf_counter() - started
+    run_id = response.json()["run_id"]
     while True:
         state = client.get(f"/agent/runs/{run_id}").json()
         if state["status"] in SETTLED or time.perf_counter() - started > timeout:
             return state, time.perf_counter() - started
         time.sleep(1.5)
+
+
+def upload_fixtures(client: httpx.Client, timeout: float = 180) -> list[str]:
+    headers = {"X-User-Id": "eval-fixtures", "X-User-Groups": FIXTURE_GROUPS}
+    ids = []
+    for path in sorted(FIXTURES.glob("*.md")):
+        files = {"file": (path.name, path.read_bytes(), "text/plain")}
+        response = client.post("/documents", files=files, data={"groups": FIXTURE_GROUPS}, headers=headers)
+        ids.append(response.raise_for_status().json()["document_id"])
+    started = time.perf_counter()
+    while time.perf_counter() - started < timeout:
+        statuses = [client.get(f"/documents/{doc}").json()["versions"][0]["status"] for doc in ids]
+        if all(status == "READY" for status in statuses):
+            return ids
+        time.sleep(2)
+    raise RuntimeError(f"fixtures did not become READY: {statuses}")
+
+
+def remove_fixtures(client: httpx.Client, ids: list[str]) -> None:
+    for doc in ids:
+        client.delete(f"/documents/{doc}")
 
 
 def deny_leftover_approvals(client: httpx.Client) -> None:
@@ -92,6 +121,7 @@ def main() -> None:
     cases = [case for case in json.loads(CASES.read_text()) if not args.only or case["id"] in args.only]
     outcomes: list[Outcome] = []
     with httpx.Client(base_url=args.api, timeout=30) as client:
+        fixture_ids = upload_fixtures(client)
         titles: dict[str, str] = {}
         for groups in ("employees,managers", "contractors"):
             for document in client.get("/documents", headers={"X-User-Id": "eval", "X-User-Groups": groups}).json():
@@ -103,6 +133,7 @@ def main() -> None:
             mark = "PASS" if outcome.passed else "FAIL"
             print(f"{mark} {case['id']:<24} {seconds:6.1f}s {'; '.join(outcome.failures)}")
         deny_leftover_approvals(client)
+        remove_fixtures(client, fixture_ids)
 
     passed = sum(outcome.passed for outcome in outcomes)
     rate = passed / len(outcomes) if outcomes else 0.0
