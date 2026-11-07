@@ -109,7 +109,8 @@
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const terminal = new Set(["COMPLETED", "DENIED", "FAILED"]);
+const terminal = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED"]);
+const conversation = [];
 const STRONG_MATCH = 0.6;
 
 const auth = { mode: "headers", issuer: "", clientId: "", token: null, refresh: null, claims: null };
@@ -229,7 +230,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 function statusChip(state) {
-  const kind = { COMPLETED: "good", DENIED: "bad", FAILED: "bad", ESCALATED: "warn", WAITING_APPROVAL: "warn" }[state.status] || "";
+  const kind = { COMPLETED: "good", DENIED: "bad", FAILED: "bad", EXPIRED: "bad", ESCALATED: "warn", WAITING_APPROVAL: "warn" }[state.status] || "";
   return el("span", { class: `chip ${kind}` }, state.status.replace("_", " ").toLowerCase());
 }
 
@@ -240,6 +241,7 @@ function renderBot(node, state) {
   if (state.intent) meta.append(el("span", { class: "chip" }, state.intent));
   if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
   if (state.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
+  if (state.needs_input) meta.append(el("span", { class: "chip warn" }, "needs details"));
   if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
   for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
   node.append(meta);
@@ -261,7 +263,7 @@ async function poll(runId, node) {
     try {
       const state = await api(`/agent/runs/${runId}`);
       renderBot(node, state);
-      if (terminal.has(state.status)) return;
+      if (terminal.has(state.status)) return state;
     } catch (_) {}
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
@@ -283,9 +285,10 @@ $("ask").addEventListener("submit", async (event) => {
     const { run_id } = await api("/agent/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, history: conversation.slice(-3) }),
     });
-    await poll(run_id, bot);
+    const final = await poll(run_id, bot);
+    if (final && final.answer) conversation.push({ question, answer: final.answer });
   } catch (error) {
     bot.remove();
     $("ask-error").textContent = error.message;
@@ -358,7 +361,7 @@ async function loadInbox() {
   }
 }
 
-$("who").addEventListener("change", () => { loadDocs(); loadInbox(); });
+$("who").addEventListener("change", () => { conversation.length = 0; loadDocs(); loadInbox(); });
 startAuth().then(() => {
   if (auth.mode === "oidc" && !auth.token) return;
   loadDocs();
