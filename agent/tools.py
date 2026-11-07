@@ -108,3 +108,8 @@ def schemas(names: list[str] | None = None) -> list[dict[str, Any]]:
         for spec in REGISTRY.values()
         if names is None or spec.name in names
     ]
+
+
+def may_use(tool: str, groups: list[str]) -> bool:
+    spec = REGISTRY.get(tool)
+    return spec is not None and bool(spec.allowed_groups.intersection(groups))
