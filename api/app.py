@@ -14,6 +14,7 @@ from temporalio.client import Client
 from api import services
 from api.admission import BacklogGate, InflightLimit
 from api.auth import current_user
+from api.ops.router import router as ops_router
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
 from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
 from common import storage
@@ -40,14 +41,16 @@ agent_gate = BacklogGate(AGENT, settings.max_agent_backlog)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     app_state.temporal = await connect()
+    app.state.temporal = app_state.temporal
     await storage.ensure_bucket()
     yield
 
 
 app = FastAPI(title="Antara API", lifespan=lifespan)
 app.mount("/metrics", make_asgi_app())
+app.include_router(ops_router)
 FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,metrics")
 
 
@@ -96,6 +99,11 @@ async def admit_agent(client: Client = Depends(temporal)) -> None:
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/ops", include_in_schema=False)
+async def ops_console() -> FileResponse:
+    return FileResponse(STATIC_DIR / "ops.html")
 
 
 @app.get("/auth/config")
