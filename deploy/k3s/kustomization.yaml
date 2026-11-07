@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - config.yaml
+  - data.yaml
+  - temporal.yaml
+  - gpu.yaml
+  - models.yaml
+  - app.yaml
+  - keda.yaml
+  - network-policy.yaml
+  - observability.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: app-db-schema
+    namespace: antara
+    files:
+      - ../sql/001_schema.sql
+      - ../sql/002_approvals.sql
+      - ../sql/003_incidents.sql
+      - ../sql/004_answer_cache.sql
+  - name: prometheus-config
+    namespace: antara
+    files:
+      - observability/prometheus.yml
+  - name: grafana-datasources
+    namespace: antara
+    files:
+      - ../compose/grafana/provisioning/datasources/datasources.yml
+  - name: grafana-dashboard-provider
+    namespace: antara
+    files:
+      - ../compose/grafana/provisioning/dashboards/dashboards.yml
+  - name: grafana-dashboards
+    namespace: antara
+    files:
+      - ../compose/grafana/dashboards/antara-overview.json
