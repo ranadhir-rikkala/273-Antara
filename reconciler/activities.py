@@ -1,5 +1,6 @@
 from temporalio import activity
 
+from common.config import settings
 from common.db import pool
 from common.models import IngestRequest
 from common.names import Activities
@@ -11,5 +12,7 @@ from reconciler.adapters import PostgresVersionScanner, TemporalWorkflowInspecto
 @activity.defn(name=Activities.FIND_INCONSISTENT)
 async def find_inconsistent_versions() -> list[IngestRequest]:
     return await services.find_inconsistent(
-        PostgresVersionScanner(await pool()), TemporalWorkflowInspector(await shared())
+        PostgresVersionScanner(await pool()),
+        TemporalWorkflowInspector(await shared()),
+        settings.reconcile_stale_minutes,
     )

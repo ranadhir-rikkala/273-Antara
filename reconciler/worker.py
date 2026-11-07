@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 from datetime import timedelta
 
 from temporalio.client import (
@@ -11,6 +10,7 @@ from temporalio.client import (
     ScheduleOverlapPolicy,
     SchedulePolicy,
     ScheduleSpec,
+    ScheduleUpdate,
 )
 from temporalio.worker import Worker
 
@@ -22,19 +22,21 @@ from reconciler.activities import find_inconsistent_versions
 from reconciler.workflows import ReconcilerWorkflow
 
 SCHEDULE_ID = "antara-reconciler"
-INTERVAL = timedelta(minutes=2)
+
+
+def reconciler_schedule() -> Schedule:
+    return Schedule(
+        action=ScheduleActionStartWorkflow(Workflows.RECONCILER, id="reconciler", task_queue=RECONCILER),
+        spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(seconds=settings.reconcile_every_seconds))]),
+        policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
+    )
 
 
 async def ensure_schedule(client: Client) -> None:
-    with contextlib.suppress(ScheduleAlreadyRunningError):
-        await client.create_schedule(
-            SCHEDULE_ID,
-            Schedule(
-                action=ScheduleActionStartWorkflow(Workflows.RECONCILER, id="reconciler", task_queue=RECONCILER),
-                spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=INTERVAL)]),
-                policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
-            ),
-        )
+    try:
+        await client.create_schedule(SCHEDULE_ID, reconciler_schedule())
+    except ScheduleAlreadyRunningError:
+        await client.get_schedule_handle(SCHEDULE_ID).update(lambda _: ScheduleUpdate(schedule=reconciler_schedule()))
 
 
 async def main() -> None:
