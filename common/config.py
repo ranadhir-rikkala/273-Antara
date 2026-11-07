@@ -47,6 +47,7 @@ class Settings(BaseSettings):
 
     cache_similarity: float = 0.95
     cache_ttl_hours: int = 24
+    cache_min_citation_score: float = 0.6
     max_ingest_backlog: int = 500
     max_agent_backlog: int = 100
 

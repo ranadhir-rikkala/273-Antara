@@ -36,6 +36,7 @@ escalations: list[str] = []
 
 incident_reports: list[str] = []
 cache: dict[str, CachedAnswer] = {}
+weak_retrieval: list[bool] = []
 retrievals: list[str] = []
 
 
@@ -65,6 +66,8 @@ async def fake_report_incident(report: IncidentReport) -> IncidentResult:
 @activity.defn(name=Activities.RETRIEVE)
 async def fake_retrieve(request: RetrieveRequest) -> list[ChunkResult]:
     retrievals.append(request.query)
+    if weak_retrieval:
+        return [ChunkResult("doc-2", "ver-2", "chunk-9", "Unrelated laptop policy.", 1, 0.38)]
     return [ChunkResult("doc-1", "ver-1", "chunk-1", "Prod database access needs manager approval.", 1, 0.91)]
 
 
@@ -205,3 +208,16 @@ async def test_plain_questions_are_never_offered_tools() -> None:
     assert result.status == RunStatus.COMPLETED
     assert tool_offers == [False]
     assert executed == []
+
+
+async def test_weakly_supported_answers_are_not_cached() -> None:
+    cache.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            weak_retrieval.append(True)
+            try:
+                await (await _run(env, "agent-weak", "What is the L4 salary band?")).result()
+            finally:
+                weak_retrieval.clear()
+    assert cache == {}

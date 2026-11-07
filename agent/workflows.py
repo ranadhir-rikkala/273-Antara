@@ -4,6 +4,7 @@ from typing import Any
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from common.config import settings
     from common.models import (
         AgentRunRequest,
         AgentRunState,
@@ -92,7 +93,7 @@ class AgentRunWorkflow:
             if turn.tool_call is None:
                 self._state.answer = turn.answer
                 self._state.status = RunStatus.COMPLETED
-                if self._state.intent == Intent.QUESTION and chunks and not tool_results and turn.answer:
+                if self._should_cache(chunks, tool_results, turn.answer):
                     await workflow.execute_activity(
                         Activities.CACHE_STORE,
                         CacheStoreRequest(
@@ -124,6 +125,10 @@ class AgentRunWorkflow:
             tool_results.append({"tool": turn.tool_call.name, "status": result.status, "output": result.output})
         self._state.status = RunStatus.FAILED
         return self._state
+
+    def _should_cache(self, chunks: list[ChunkResult], tool_results: list[dict[str, Any]], answer: str | None) -> bool:
+        confident = bool(chunks) and chunks[0].score >= settings.cache_min_citation_score
+        return self._state.intent == Intent.QUESTION and confident and not tool_results and bool(answer)
 
     async def _report_incident(self, request: AgentRunRequest) -> AgentRunState:
         run_id = workflow.info().workflow_id
