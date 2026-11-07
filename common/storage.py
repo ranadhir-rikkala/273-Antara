@@ -63,3 +63,14 @@ async def get_bytes(key: str) -> bytes:
 
 async def delete_prefix(prefix: str) -> int:
     return await asyncio.to_thread(_delete_prefix, prefix)
+
+
+class S3ObjectStore:
+    async def get(self, key: str) -> bytes:
+        return await get_bytes(key)
+
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
+        await put_bytes(key, data, content_type)
+
+    async def delete_prefix(self, prefix: str) -> int:
+        return await delete_prefix(prefix)

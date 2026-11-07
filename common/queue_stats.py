@@ -24,3 +24,11 @@ async def queue_stats(
         )
     )
     return QueueStats(backlog=response.stats.approximate_backlog_count, pollers=len(response.pollers))
+
+
+class TemporalQueueInspector:
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    async def stats(self, queue: str) -> QueueStats:
+        return await queue_stats(self._client, queue)
