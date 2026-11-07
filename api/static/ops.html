@@ -201,7 +201,6 @@ function absorb(state) {
     const key = `${event.at}|${event.kind}`;
     if (seenEvents.has(key)) continue;
     seenEvents.add(key);
-    if (previous === null) continue;
     const describe = EVENT_TEXT[event.kind] || (() => [event.kind, "info"]);
     const [text, kind] = describe(event.detail || {});
     note(kind, `${text} · by ${event.actor}`, new Date(event.at));
