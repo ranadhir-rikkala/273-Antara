@@ -80,11 +80,11 @@ async def test_questions_get_a_tool_free_completion() -> None:
 
 
 async def test_actions_offer_only_the_named_tools_and_parse_the_call() -> None:
-    call = {"tool_calls": [{"function": {"name": "request_access", "arguments": '{"system": "vpn", "role": "user"}'}}]}
+    call = {"tool_calls": [{"function": {"name": "request_access", "arguments": '{"system": "vpn", "role": "read"}'}}]}
     model = FakeModel(tool_message=call)
     turn = await services.generate(GenerateRequest("I need vpn access", [], tool_names=["request_access"]), model)
     assert model.offered_tools == [["request_access"]]
-    assert turn.tool_call == ToolCall("request_access", {"system": "vpn", "role": "user"}, requires_approval=True)
+    assert turn.tool_call == ToolCall("request_access", {"system": "vpn", "role": "read"}, requires_approval=True)
 
 
 async def test_unknown_tool_names_from_the_model_never_require_approval() -> None:
@@ -239,3 +239,14 @@ async def test_reports_naming_no_known_system_still_merge_by_similarity() -> Non
     assert first.system is None
     assert second.incident_id == first.incident_id and second.reporter_count == 2
     assert other.incident_id != first.incident_id
+
+
+async def test_tool_calls_with_missing_details_become_a_clarifying_question() -> None:
+    call = {
+        "tool_calls": [{"function": {"name": "create_ticket", "arguments": '{"title": "Ticket", "description": "x"}'}}]
+    }
+    turn = await services.generate(
+        GenerateRequest("Please create a ticket", [], tool_names=["create_ticket"]), FakeModel(tool_message=call)
+    )
+    assert turn.tool_call is None and turn.needs_input is True
+    assert "What is the problem" in turn.answer

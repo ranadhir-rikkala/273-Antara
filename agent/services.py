@@ -11,7 +11,7 @@ from agent.ports import (
     Retriever,
     ToolUnitOfWork,
 )
-from agent.tools import HANDLERS, REGISTRY, schemas
+from agent.tools import HANDLERS, REGISTRY, clarifying_question, prepare_arguments, schemas
 from agent.triage import CLASSIFY_PROMPT, affected_system, classify_by_rules, needs_model, parse_intent
 from common.models import (
     ApprovalOpenRequest,
@@ -105,13 +105,13 @@ async def generate(request: GenerateRequest, model: ChatModel, min_score: float 
         return ModelTurn(answer=message.get("content") or "")
     function = calls[0]["function"]
     spec = REGISTRY.get(function["name"])
-    return ModelTurn(
-        tool_call=ToolCall(
-            name=function["name"],
-            arguments=parse_arguments(function.get("arguments")),
-            requires_approval=spec.requires_approval if spec else False,
-        )
-    )
+    arguments = parse_arguments(function.get("arguments"))
+    if spec is None:
+        return ModelTurn(tool_call=ToolCall(name=function["name"], arguments=arguments))
+    arguments, missing = prepare_arguments(spec, arguments, request.question)
+    if missing:
+        return ModelTurn(answer=clarifying_question(spec, missing), needs_input=True)
+    return ModelTurn(tool_call=ToolCall(name=spec.name, arguments=arguments, requires_approval=spec.requires_approval))
 
 
 async def execute_tool(request: ToolRequest, unit_of_work: ToolUnitOfWork) -> ToolResult:

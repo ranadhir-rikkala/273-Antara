@@ -102,6 +102,7 @@ class ToolCall:
 class ModelTurn:
     answer: str | None = None
     tool_call: ToolCall | None = None
+    needs_input: bool = False
 
 
 @dataclass
@@ -196,6 +197,7 @@ class AgentRunState:
     intent: str | None = None
     incident: IncidentResult | None = None
     cached: bool = False
+    needs_input: bool = False
 
 
 @dataclass
