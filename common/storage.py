@@ -2,6 +2,7 @@ import asyncio
 import io
 
 from minio import Minio
+from urllib3.exceptions import MaxRetryError
 
 from common.config import settings
 
@@ -20,8 +21,15 @@ def _ensure_bucket(minio: Minio) -> None:
         minio.make_bucket(settings.s3_bucket)
 
 
-async def ensure_bucket() -> None:
-    await asyncio.to_thread(_ensure_bucket, client())
+async def ensure_bucket(attempts: int = 30, delay_seconds: float = 1.0) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            await asyncio.to_thread(_ensure_bucket, client())
+            return
+        except (OSError, MaxRetryError):
+            if attempt == attempts:
+                raise
+            await asyncio.sleep(delay_seconds)
 
 
 def _put(key: str, data: bytes, content_type: str) -> None:
