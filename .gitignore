@@ -9,3 +9,4 @@ deploy/aws/.state
 *.pem
 deploy/local/.kube/
 .idea/
+evals/results/
