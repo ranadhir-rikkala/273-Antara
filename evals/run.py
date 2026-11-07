@@ -34,7 +34,7 @@ def check(case: dict[str, Any], state: dict[str, Any], titles: dict[str, str]) -
     if "http" in expect:
         return [] if state.get("http") == expect["http"] else [f"http {state.get('http', 202)} != {expect['http']}"]
     answer = (state.get("answer") or "").lower()
-    cited = [titles.get(c["document_id"], c["document_id"]) for c in state.get("citations", [])]
+    cited = [titles[c["document_id"]] for c in state.get("citations", [])]
     tools = state.get("tool_results", [])
     failures = []
     if state["status"] != expect["status"]:
@@ -128,6 +128,11 @@ def main() -> None:
                 titles[document["document_id"]] = document["title"]
         for case in cases:
             state, seconds = run_case(client, case, args.timeout)
+            for citation in state.get("citations", []):
+                if citation["document_id"] not in titles:
+                    titles[citation["document_id"]] = client.get(f"/documents/{citation['document_id']}").json()[
+                        "title"
+                    ]
             outcome = Outcome(case["id"], check(case, state, titles), seconds)
             outcomes.append(outcome)
             mark = "PASS" if outcome.passed else "FAIL"
