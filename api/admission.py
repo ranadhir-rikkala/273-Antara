@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 from fastapi import HTTPException
 from prometheus_client import Counter, Gauge
@@ -50,6 +50,30 @@ class BacklogGate:
                 status_code=429,
                 detail=f"Queue {self.queue} has {backlog} waiting tasks; try again shortly",
                 headers={"Retry-After": str(retry_after_seconds(backlog, self.limit))},
+            )
+
+
+class LoadGate:
+    def __init__(self, name: str, limit: int, read: Callable[[], Awaitable[int]], refresh_seconds: float = 2.0) -> None:
+        self.name = name
+        self.limit = limit
+        self.rejected = 0
+        self._read = read
+        self._refresh_seconds = refresh_seconds
+        self._value = 0
+        self._checked_at = float("-inf")
+
+    async def admit(self) -> None:
+        if time.monotonic() - self._checked_at >= self._refresh_seconds:
+            self._value = await self._read()
+            self._checked_at = time.monotonic()
+        if self._value > self.limit:
+            self.rejected += 1
+            REJECTED.labels(self.name).inc()
+            raise HTTPException(
+                status_code=429,
+                detail=f"{self._value} documents are still being processed; try again shortly",
+                headers={"Retry-After": str(retry_after_seconds(self._value, self.limit))},
             )
 
 

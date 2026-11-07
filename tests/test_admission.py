@@ -72,3 +72,20 @@ async def test_inflight_limit_rejects_when_every_slot_is_taken() -> None:
     assert error.value.status_code == 429 and limit.rejected == 1
     with pytest.raises(StopAsyncIteration):
         await holder.__anext__()
+
+
+async def test_load_gate_rejects_when_too_much_work_is_in_flight() -> None:
+    from api.admission import LoadGate
+
+    in_flight = {"documents": 75}
+
+    async def read() -> int:
+        return in_flight["documents"]
+
+    gate = LoadGate("documents-in-flight", limit=60, read=read, refresh_seconds=0)
+    with pytest.raises(HTTPException) as error:
+        await gate.admit()
+    assert error.value.status_code == 429 and "75 documents" in error.value.detail
+    in_flight["documents"] = 10
+    await gate.admit()
+    assert gate.rejected == 1
