@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antara Operations</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #1b2230; --muted: #5e6776; --line: #dde2ea; --chip: #eef1f6;
+    --accent: #2357d9; --good: #1a7f4b; --warn: #a55d00; --bad: #b42318; --good-bg: #e3f4ea; --warn-bg: #fbefdc; --bad-bg: #fbe5e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11141a; --panel: #1a1f28; --ink: #e6e9ef; --muted: #98a1b0; --line: #2b323e; --chip: #232a36;
+      --accent: #7398ff; --good: #5ccf8e; --warn: #f1b35a; --bad: #ff7b6f; --good-bg: #173326; --warn-bg: #3a2c14; --bad-bg: #3d1d1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+           padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 17px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  a { color: var(--accent); }
+  select, button { font: inherit; }
+  select { padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .live { font-size: 12px; color: var(--muted); }
+  .live::before { content: "●"; color: var(--good); margin-right: 5px; }
+  .live.stale::before { color: var(--bad); }
+  main { padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .kpi .label { font-size: 12px; color: var(--muted); }
+  .kpi .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi.bad { border-color: var(--bad); } .kpi.bad .value { color: var(--bad); }
+  .kpi.warn .value { color: var(--warn); }
+  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } main { padding: 12px; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  section h2 { margin: 0 0 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  section h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .queue { display: grid; grid-template-columns: 96px 1fr 52px 78px; align-items: center; gap: 10px; padding: 5px 0; }
+  .queue .name { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .bar { height: 10px; background: var(--chip); border-radius: 5px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); border-radius: 5px; transition: width .4s; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pollers { font-size: 12px; color: var(--muted); }
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .app { border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .app .title { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .pods { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pod { width: 18px; height: 18px; border-radius: 5px; background: var(--good); transition: background .3s; }
+  .pod.starting { background: var(--warn); }
+  .pod.terminating { background: var(--bad); }
+  .pod.restarted { outline: 2px solid var(--warn); outline-offset: 1px; }
+  .throughput div { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; border-bottom: 1px dashed var(--line); }
+  .chaos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .chaos button { text-align: left; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+                  color: var(--ink); cursor: pointer; }
+  .chaos button b { display: block; font-size: 13px; }
+  .chaos button span { font-size: 11px; color: var(--muted); }
+  .chaos button:hover { border-color: var(--accent); }
+  .chaos button.danger b { color: var(--bad); }
+  .chaos button:disabled { opacity: .5; cursor: default; }
+  .notice { font-size: 12px; min-height: 18px; margin-top: 8px; color: var(--muted); }
+  .notice.error { color: var(--bad); }
+  .timeline { max-height: 340px; overflow-y: auto; font-size: 12px; }
+  .event { display: grid; grid-template-columns: 62px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .event time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .event.chaos { color: var(--bad); } .event.heal { color: var(--good); } .event.info { color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td, th { text-align: left; padding: 4px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  .chip { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11px; background: var(--chip); }
+  .chip.RUNNING { background: var(--warn-bg); color: var(--warn); }
+  .chip.COMPLETED { background: var(--good-bg); color: var(--good); }
+  .chip.FAILED, .chip.TERMINATED, .chip.TIMED_OUT { background: var(--bad-bg); color: var(--bad); }
+  .muted { color: var(--muted); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Antara Operations</h1>
+    <div class="sub">Live view of the distributed system behind the helpdesk · <a href="/">open helpdesk</a></div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <span id="live" class="live">connecting</span>
+    <select id="who">
+      <option value="erin|operators">erin (operator)</option>
+      <option value="carol|managers">carol (manager, no ops access)</option>
+    </select>
+  </div>
+</header>
+<main>
+  <div id="denied" class="notice error" hidden></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid">
+    <div>
+      <section>
+        <h2>Task queues <small>backlog waiting · live worker pollers</small></h2>
+        <div id="queues"></div>
+      </section>
+      <section>
+        <h2>Workers <small>one square per pod · green ready · amber starting · red stopping</small></h2>
+        <div class="apps" id="apps"></div>
+      </section>
+      <section>
+        <h2>Load balancing <small>activities per second, per worker pod</small></h2>
+        <div class="throughput" id="throughput"></div>
+      </section>
+      <section>
+        <h2>Recent workflows <small>durable executions in Temporal</small></h2>
+        <table><thead><tr><th>Type</th><th>Workflow</th><th>Status</th><th>Started</th></tr></thead><tbody id="workflows"></tbody></table>
+      </section>
+    </div>
+    <div>
+      <section>
+        <h2>Chaos controls <small id="chaos-state"></small></h2>
+        <div class="chaos" id="chaos">
+          <button data-action="kill" data-target="agent" class="danger"><b>Kill agent worker</b><span>Crash recovery · resumes on a new pod</span></button>
+          <button data-action="kill" data-target="ingest-cpu" class="danger"><b>Kill ingest worker</b><span>Work stays queued · no loss</span></button>
+          <button data-action="outage" class="danger"><b>Model outage 30s</b><span>Retries with backoff</span></button>
+          <button data-action="gpu" class="danger" id="gpu-button"><b>Lose GPU lane</b><span>Embedding moves to CPU after 20s</span></button>
+          <button data-action="flood" class="danger"><b>Flood traffic</b><span>200 docs + 50 questions · scale + 429s</span></button>
+          <button data-action="corrupt" class="danger"><b>Corrupt the index</b><span>Deletes a document's vectors</span></button>
+          <button data-action="reconcile"><b>Run reconciler now</b><span>Detects and repairs broken state</span></button>
+          <button data-action="refresh"><b>Refresh</b><span>Pull a fresh snapshot</span></button>
+        </div>
+        <div id="notice" class="notice"></div>
+      </section>
+      <section>
+        <h2>Timeline <small>chaos in red · recovery in green</small></h2>
+        <div class="timeline" id="timeline"></div>
+      </section>
+      <section>
+        <h2>Open incidents</h2>
+        <div id="incidents" class="muted">None</div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const timeline = [];
+let previous = null;
+let gpuDown = false;
+let lastOk = 0;
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value; else if (key === "style") node.style.cssText = value; else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  return node;
+}
+
+function headers(extra = {}) {
+  const [user, groups] = $("who").value.split("|");
+  return { "X-User-Id": user, "X-User-Groups": groups, ...extra };
+}
+
+async function call(path, body) {
+  const response = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: headers(body === undefined ? {} : { "content-type": "application/json" }),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || response.statusText);
+  return data;
+}
+
+function clock(date = new Date()) {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function note(kind, text, at = new Date()) {
+  timeline.unshift({ kind, text, at });
+  timeline.splice(80);
+}
+
+const EVENT_TEXT = {
+  "chaos.kill-worker": (d) => [`Killed pod ${d.pod}`, "chaos"],
+  "chaos.model-outage": (d) => [`Model outage started (${d.seconds}s)`, "chaos"],
+  "chaos.gpu-lane-down": () => ["GPU lane taken down", "chaos"],
+  "chaos.gpu-lane-restored": () => ["GPU lane restored", "heal"],
+  "chaos.corrupt-index": (d) => [`Corrupted index for ${d.title} (${d.embeddings_deleted} vectors deleted)`, "chaos"],
+  "chaos.flood-started": (d) => [`Flood started: ${d.documents} documents, ${d.questions} questions`, "chaos"],
+  "chaos.flood-finished": (d) => [`Flood finished: ${Object.entries(d.responses).map(([k, v]) => `${k} ×${v}`).join(", ")}`, "info"],
+  "ops.reconciler-triggered": () => ["Reconciler run requested", "info"],
+};
+
+const seenEvents = new Set();
+
+function absorb(state) {
+  for (const event of [...state.events].reverse()) {
+    const key = `${event.at}|${event.kind}`;
+    if (seenEvents.has(key)) continue;
+    seenEvents.add(key);
+    if (previous === null) continue;
+    const describe = EVENT_TEXT[event.kind] || (() => [event.kind, "info"]);
+    const [text, kind] = describe(event.detail || {});
+    note(kind, `${text} · by ${event.actor}`, new Date(event.at));
+  }
+  if (previous) {
+    const before = new Map(previous.pods.map((pod) => [pod.name, pod]));
+    const now = new Map(state.pods.map((pod) => [pod.name, pod]));
+    for (const [name, pod] of now) {
+      const old = before.get(name);
+      if (!old) note("info", `New ${pod.app} pod scheduled: ${name}`);
+      else if (!old.ready && pod.ready && !pod.terminating) note("heal", `${pod.app} pod ready: ${name}`);
+    }
+    for (const [name, pod] of before) if (!now.has(name)) note("info", `${pod.app} pod gone: ${name}`);
+    const wasOut = previous.model.chaos, isOut = state.model.chaos;
+    if (!wasOut && isOut) note("chaos", "Model gateway is failing requests");
+    if (wasOut && !isOut) note("heal", "Model gateway healthy again");
+    const docsBefore = previous.counts.documents || {}, docsNow = state.counts.documents || {};
+    if ((docsNow.READY || 0) > (docsBefore.READY || 0) && (docsBefore.PROCESSING || 0) > (docsNow.PROCESSING || 0)) {
+      note("heal", `Documents repaired or ingested: ${docsNow.READY} ready`);
+    }
+  }
+}
+
+function kpi(label, value, tone = "") {
+  return el("div", { class: `kpi ${tone}` }, el("div", { class: "label" }, label), el("div", { class: "value" }, value));
+}
+
+function render(state) {
+  const s = state.summary;
+  const rejected = state.metrics.rejected_429 ?? 0;
+  $("kpis").replaceChildren(
+    kpi("Pods ready", `${s.pods_ready}/${s.pods_total}`, s.pods_ready < s.pods_total ? "warn" : ""),
+    kpi("Queue backlog", s.backlog, s.backlog > 20 ? "warn" : ""),
+    kpi("Workflows running", s.workflows_running),
+    kpi("Approvals pending", s.approvals_pending),
+    kpi("Open incidents", s.incidents_open, s.incidents_open ? "warn" : ""),
+    kpi("Rejected (429)", Math.round(rejected), rejected ? "warn" : ""),
+    kpi("Model", state.model.chaos ? "OUTAGE" : (state.model.ok ? "healthy" : "unknown"), state.model.chaos ? "bad" : ""),
+  );
+  const maxBacklog = Math.max(10, ...state.queues.map((queue) => queue.backlog || 0));
+  $("queues").replaceChildren(...state.queues.map((queue) => el("div", { class: "queue" },
+    el("span", { class: "name" }, queue.name),
+    el("div", { class: "bar" }, el("span", { style: `width:${Math.min(100, ((queue.backlog || 0) / maxBacklog) * 100)}%` })),
+    el("span", { class: "num" }, queue.error ? "?" : queue.backlog),
+    el("span", { class: "pollers" }, queue.error ? "unavailable" : `${queue.pollers} poller${queue.pollers === 1 ? "" : "s"}`),
+  )));
+  const groups = new Map();
+  for (const pod of state.pods) {
+    if (!groups.has(pod.app)) groups.set(pod.app, []);
+    groups.get(pod.app).push(pod);
+  }
+  $("apps").replaceChildren(...[...groups].map(([app, pods]) => el("div", { class: "app" },
+    el("div", { class: "title" }, el("span", {}, app), el("span", { class: "muted" }, `${pods.filter((p) => p.ready && !p.terminating).length}/${pods.length}`)),
+    el("div", { class: "pods" }, ...pods.map((pod) => el("div", {
+      class: `pod ${pod.terminating ? "terminating" : pod.ready ? "" : "starting"} ${pod.restarts ? "restarted" : ""}`,
+      title: `${pod.name}\n${pod.phase}${pod.terminating ? " (stopping)" : ""}\nrestarts: ${pod.restarts}`,
+    }))),
+  )));
+  if (state.errors.pods) $("apps").replaceChildren(el("div", { class: "muted" }, `Pods unavailable: ${state.errors.pods}`));
+  const throughput = Object.entries(state.metrics.activities_per_second || {}).sort((a, b) => b[1] - a[1]);
+  $("throughput").replaceChildren(...(throughput.length ? throughput.map(([pod, rate]) =>
+    el("div", {}, el("code", {}, pod), el("span", {}, `${rate.toFixed(2)}/s`))) : [el("span", { class: "muted" }, "Idle. Flood traffic to watch work spread across pods.")]));
+  $("workflows").replaceChildren(...state.workflows.map((workflow) => el("tr", {},
+    el("td", {}, workflow.type.replace("Workflow", "")),
+    el("td", {}, el("code", {}, workflow.id.length > 26 ? `${workflow.id.slice(0, 26)}…` : workflow.id)),
+    el("td", {}, el("span", { class: `chip ${workflow.status}` }, workflow.status.toLowerCase())),
+    el("td", { class: "muted" }, workflow.started ? clock(new Date(workflow.started)) : ""),
+  )));
+  $("incidents").replaceChildren(...(state.incidents.length ? state.incidents.map((incident) =>
+    el("div", { style: "padding:4px 0" }, el("b", {}, incident.system || "other"), ` · ${incident.reporters} reporter${incident.reporters === 1 ? "" : "s"} · `, el("span", { class: "muted" }, incident.title))) : ["None"]));
+  $("timeline").replaceChildren(...(timeline.length ? timeline.map((item) =>
+    el("div", { class: `event ${item.kind}` }, el("time", {}, clock(item.at)), el("span", {}, item.text))) : [el("span", { class: "muted" }, "Press a chaos button and watch the system recover.")]));
+  $("chaos-state").textContent = state.chaos_enabled ? "enabled" : "disabled in this environment";
+  for (const button of $("chaos").querySelectorAll("button")) {
+    if (button.dataset.action !== "refresh" && button.dataset.action !== "reconcile") button.disabled = !state.chaos_enabled;
+  }
+}
+
+async function refresh() {
+  try {
+    const state = await call("/ops/state");
+    $("denied").hidden = true;
+    absorb(state);
+    render(state);
+    previous = state;
+    lastOk = Date.now();
+  } catch (error) {
+    $("denied").hidden = false;
+    $("denied").textContent = error.message;
+  }
+}
+
+const ACTIONS = {
+  kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Killed ${r.killed}`),
+  outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "Model will fail for 30 seconds"),
+  gpu: () => call("/ops/chaos/gpu-lane", { down: !gpuDown }).then((r) => {
+    gpuDown = r.gpu_lane_down;
+    $("gpu-button").querySelector("b").textContent = gpuDown ? "Restore GPU lane" : "Lose GPU lane";
+    return gpuDown ? "GPU lane is down. Upload a document to watch it fall back to CPU." : "GPU lane restored";
+  }),
+  flood: () => call("/ops/chaos/flood", { documents: 200, questions: 50 }).then(() => "Flood running in the background"),
+  corrupt: () => call("/ops/chaos/corrupt-index", {}).then((r) => `Corrupted ${r.title}. The reconciler repairs it within about 30s.`),
+  reconcile: () => call("/ops/reconcile", {}).then(() => "Reconciler triggered"),
+  refresh: async () => "Refreshed",
+};
+
+$("chaos").addEventListener("click", async (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  button.disabled = true;
+  $("notice").className = "notice";
+  try {
+    $("notice").textContent = await ACTIONS[button.dataset.action](button);
+  } catch (error) {
+    $("notice").className = "notice error";
+    $("notice").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    refresh();
+  }
+});
+
+$("who").addEventListener("change", refresh);
+setInterval(() => {
+  const age = Math.round((Date.now() - lastOk) / 1000);
+  $("live").textContent = lastOk ? `live · updated ${age}s ago` : "connecting";
+  $("live").classList.toggle("stale", !lastOk || age > 6);
+}, 1000);
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
