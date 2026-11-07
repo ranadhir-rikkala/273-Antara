@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     answer_min_score: float = 0.6
     max_ingest_backlog: int = 500
     max_agent_backlog: int = 100
+    max_documents_in_flight: int = 1000
 
 
 settings = Settings()

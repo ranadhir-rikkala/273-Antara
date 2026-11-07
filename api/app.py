@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from temporalio.client import Client
 
 from api import services
-from api.admission import BacklogGate, InflightLimit
+from api.admission import BacklogGate, InflightLimit, LoadGate
 from api.auth import current_user
 from api.ops.router import router as ops_router
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
@@ -38,6 +38,13 @@ app_state = AppState()
 inflight = InflightLimit(settings.max_inflight_requests)
 ingest_gate = BacklogGate(INGEST_CPU, settings.max_ingest_backlog)
 agent_gate = BacklogGate(AGENT, settings.max_agent_backlog)
+
+
+async def _documents_in_flight() -> int:
+    return await PostgresDocumentCatalog(await pool()).count_in_flight()
+
+
+documents_gate = LoadGate("documents-in-flight", settings.max_documents_in_flight, _documents_in_flight)
 
 
 @asynccontextmanager
@@ -90,6 +97,7 @@ async def admission() -> AsyncIterator[None]:
 
 async def admit_ingest(client: Client = Depends(temporal)) -> None:
     await ingest_gate.admit(client)
+    await documents_gate.admit()
 
 
 async def admit_agent(client: Client = Depends(temporal)) -> None:
