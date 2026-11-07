@@ -9,6 +9,7 @@ COPY ingest ./ingest
 COPY agent ./agent
 COPY gateway ./gateway
 COPY reconciler ./reconciler
+COPY loadtest ./loadtest
 
 RUN pip install --no-cache-dir .
 
