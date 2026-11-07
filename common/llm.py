@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
@@ -44,3 +46,12 @@ class LLMProvider:
         response = await (client or self._client).post(path, json=payload)
         response.raise_for_status()
         return response.json()
+
+
+@asynccontextmanager
+async def model_session() -> AsyncIterator[LLMProvider]:
+    provider = LLMProvider()
+    try:
+        yield provider
+    finally:
+        await provider.aclose()
