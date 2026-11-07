@@ -2,8 +2,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from psycopg import AsyncConnection
-
+from agent.ports import ToolWorkspace
 from common.models import ToolRequest
 
 
@@ -16,46 +15,27 @@ class ToolSpec:
     requires_approval: bool
 
 
-async def _create_ticket(conn: AsyncConnection, request: ToolRequest) -> dict[str, Any]:
+async def _create_ticket(workspace: ToolWorkspace, request: ToolRequest) -> dict[str, Any]:
     args = request.call.arguments
-    row = await (
-        await conn.execute(
-            "INSERT INTO tickets (title, description, priority, requester_id) VALUES (%s, %s, %s, %s) "
-            "RETURNING ticket_id::text, status",
-            (args["title"], args["description"], args.get("priority", "medium"), request.user.user_id),
-        )
-    ).fetchone()
-    return {"ticket_id": row[0], "status": row[1]}
-
-
-async def _get_ticket_status(conn: AsyncConnection, request: ToolRequest) -> dict[str, Any]:
-    row = await (
-        await conn.execute(
-            "SELECT ticket_id::text, status, title FROM tickets WHERE ticket_id = %s AND requester_id = %s",
-            (request.call.arguments["ticket_id"], request.user.user_id),
-        )
-    ).fetchone()
-    if row is None:
-        return {"found": False}
-    return {"found": True, "ticket_id": row[0], "status": row[1], "title": row[2]}
-
-
-async def _request_access(conn: AsyncConnection, request: ToolRequest) -> dict[str, Any]:
-    args = request.call.arguments
-    row = await (
-        await conn.execute(
-            "INSERT INTO access_grants (run_id, requester_id, system, role) VALUES (%s, %s, %s, %s) "
-            "RETURNING grant_id::text",
-            (request.run_id, request.user.user_id, args["system"], args["role"]),
-        )
-    ).fetchone()
-    await conn.execute(
-        "UPDATE approvals SET status = 'GRANTED' WHERE run_id = %s AND status = 'APPROVED'", (request.run_id,)
+    return await workspace.tickets.create(
+        args["title"], args["description"], args.get("priority", "medium"), request.user.user_id
     )
-    return {"grant_id": row[0], "system": args["system"], "role": args["role"], "status": "GRANTED"}
 
 
-Handler = Callable[[AsyncConnection, ToolRequest], Awaitable[dict[str, Any]]]
+async def _get_ticket_status(workspace: ToolWorkspace, request: ToolRequest) -> dict[str, Any]:
+    ticket = await workspace.tickets.find_for_requester(request.call.arguments["ticket_id"], request.user.user_id)
+    if ticket is None:
+        return {"found": False}
+    return {"found": True, **ticket}
+
+
+async def _request_access(workspace: ToolWorkspace, request: ToolRequest) -> dict[str, Any]:
+    args = request.call.arguments
+    grant_id = await workspace.grants.grant(request.run_id, request.user.user_id, args["system"], args["role"])
+    return {"grant_id": grant_id, "system": args["system"], "role": args["role"], "status": "GRANTED"}
+
+
+Handler = Callable[[ToolWorkspace, ToolRequest], Awaitable[dict[str, Any]]]
 
 _EVERYONE = frozenset({"employees", "contractors", "managers"})
 

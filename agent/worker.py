@@ -2,11 +2,17 @@ import asyncio
 
 from temporalio.worker import Worker
 
-from agent.activities import execute_tool, generate_answer, retrieve_documents
-from agent.approvals import escalate_approval, open_approval
-from agent.cache import lookup_cached_answer, store_cached_answer
-from agent.incidents import report_incident
-from agent.triage import classify_request
+from agent.activities import (
+    classify_request,
+    escalate_approval,
+    execute_tool,
+    generate_answer,
+    lookup_cached_answer,
+    open_approval,
+    report_incident,
+    retrieve_documents,
+    store_cached_answer,
+)
 from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
 from common.config import settings
 from common.queues import AGENT, TOOLS

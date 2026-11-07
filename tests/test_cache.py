@@ -1,4 +1,4 @@
-from agent.cache import groups_key
+from agent.services import groups_key
 
 
 def test_groups_key_is_order_and_duplicate_insensitive() -> None:

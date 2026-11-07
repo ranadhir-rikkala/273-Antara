@@ -1,8 +1,4 @@
-from temporalio import activity
-
-from common.llm import LLMProvider
 from common.models import Intent
-from common.names import Activities
 
 ACTION_PHRASES = (
     "need access",
@@ -87,21 +83,3 @@ def tools_for(text: str) -> list[str] | None:
 def parse_intent(reply: str) -> Intent | None:
     word = reply.strip().strip(".").lower()
     return Intent(word) if word in {intent.value for intent in Intent} else None
-
-
-@activity.defn(name=Activities.CLASSIFY)
-async def classify_request(question: str) -> str:
-    by_rules = classify_by_rules(question)
-    if not needs_model(question, by_rules):
-        return by_rules
-    llm = LLMProvider()
-    try:
-        reply = await llm.generate(
-            [{"role": "system", "content": CLASSIFY_PROMPT}, {"role": "user", "content": question}]
-        )
-    except Exception as error:
-        activity.logger.warning("Classifier unavailable, using rules: %s", error)
-        return by_rules
-    finally:
-        await llm.aclose()
-    return parse_intent(reply) or by_rules
