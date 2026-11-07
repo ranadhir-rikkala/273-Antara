@@ -59,6 +59,7 @@ source = ["agent", "api", "ingest", "reconciler", "gateway", "common"]
 [tool.coverage.report]
 include = [
     "*/services.py",
+    "api/ops/services.py",
     "agent/tools.py",
     "agent/triage.py",
     "agent/summary.py",
