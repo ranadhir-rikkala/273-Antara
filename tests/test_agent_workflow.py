@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -32,6 +33,9 @@ from common.queues import AGENT, TOOLS
 executed: list[str] = []
 tool_offers: list[bool] = []
 escalations: list[str] = []
+opened_approvals: list[str] = []
+failing_tools: list[bool] = []
+failing_model: list[bool] = []
 
 
 incident_reports: list[str] = []
@@ -73,6 +77,8 @@ async def fake_retrieve(request: RetrieveRequest) -> list[ChunkResult]:
 
 @activity.defn(name=Activities.GENERATE)
 async def fake_generate(request: GenerateRequest) -> ModelTurn:
+    if failing_model:
+        raise ApplicationError("model unavailable", non_retryable=True)
     tool_offers.append(request.allow_tools)
     if request.allow_tools and "access" in request.question and not request.tool_results:
         return ModelTurn(
@@ -83,12 +89,15 @@ async def fake_generate(request: GenerateRequest) -> ModelTurn:
 
 @activity.defn(name=Activities.EXECUTE_TOOL)
 async def fake_execute_tool(request: ToolRequest) -> ToolResult:
+    if failing_tools:
+        raise ApplicationError("ticket system rejected the request", type="ToolError", non_retryable=True)
     executed.append(request.idempotency_key)
     return ToolResult(request.idempotency_key, "COMPLETED", {"system": "prod-db", "role": "read", "status": "GRANTED"})
 
 
 @activity.defn(name=Activities.OPEN_APPROVAL)
 async def fake_open_approval(request: ApprovalOpenRequest) -> str:
+    opened_approvals.append(request.approval_key)
     return f"approval-for-{request.approval_key}"
 
 
@@ -97,10 +106,10 @@ async def fake_escalate_approval(approval_id: str) -> None:
     escalations.append(approval_id)
 
 
-async def _run(env: WorkflowEnvironment, workflow_id: str, question: str):
+async def _run(env: WorkflowEnvironment, workflow_id: str, question: str, user: UserContext | None = None):
     return await env.client.start_workflow(
         Workflows.AGENT_RUN,
-        AgentRunRequest(question=question, user=UserContext("alice", ["employees"])),
+        AgentRunRequest(question=question, user=user or UserContext("alice", ["employees"])),
         id=workflow_id,
         task_queue=AGENT,
         result_type=AgentRunState,
@@ -222,3 +231,48 @@ async def test_weakly_supported_answers_are_not_cached() -> None:
             finally:
                 weak_retrieval.clear()
     assert cache == {}
+
+
+async def test_a_failing_tool_ends_the_run_as_failed_with_a_reason() -> None:
+    failing_tools.append(True)
+    try:
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            agent_worker, tools_worker = _workers(env)
+            async with agent_worker, tools_worker:
+                handle = await _run(env, "agent-tool-fails", "I need access to prod-db please")
+                await env.sleep(timedelta(seconds=5))
+                approval = (await handle.query(Queries.STATE, result_type=AgentRunState)).approval_id
+                assert approval is not None
+                await handle.signal(Signals.APPROVAL, ApprovalDecision(approved=True, approver_id="manager-1"))
+                result = await handle.result()
+    finally:
+        failing_tools.clear()
+    assert result.status == RunStatus.FAILED
+    assert "couldn't complete" in result.answer
+
+
+async def test_a_model_outage_ends_the_run_as_failed_instead_of_hanging() -> None:
+    failing_model.append(True)
+    try:
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            agent_worker, tools_worker = _workers(env)
+            async with agent_worker, tools_worker:
+                result = await (await _run(env, "agent-model-down", "How do I reset my password?")).result()
+    finally:
+        failing_model.clear()
+    assert result.status == RunStatus.FAILED
+    assert "temporarily unavailable" in result.answer
+
+
+async def test_forbidden_actions_are_refused_before_any_approval_is_opened() -> None:
+    opened_approvals.clear()
+    executed.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            contractor = UserContext("bob", ["contractors"])
+            result = await (await _run(env, "agent-contractor", "I need access to prod-db", contractor)).result()
+    assert result.status == RunStatus.DENIED
+    assert "not allowed" in result.answer
+    assert opened_approvals == []
+    assert executed == []

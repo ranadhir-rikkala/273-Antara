@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.exceptions import ActivityError, ChildWorkflowError
 
 with workflow.unsafe.imports_passed_through():
     from common.config import settings
@@ -31,10 +32,17 @@ with workflow.unsafe.imports_passed_through():
 
 with workflow.unsafe.imports_passed_through():
     from agent.summary import summarize_tool_result
+    from agent.tools import may_use
     from agent.triage import tools_for
 
 MAX_STEPS = 6
 ESCALATE_AFTER = timedelta(minutes=2)
+UNAVAILABLE_ANSWER = "The assistant is temporarily unavailable. Please try again in a minute."
+
+
+def failure_reason(error: Exception) -> str:
+    cause = error.cause if isinstance(error, (ActivityError, ChildWorkflowError)) and error.cause else error
+    return getattr(cause, "message", None) or str(cause)
 
 
 @workflow.defn(name=Workflows.AGENT_RUN)
@@ -43,9 +51,21 @@ class AgentRunWorkflow:
         self._state = AgentRunState(status=RunStatus.RUNNING)
         self._decision: ApprovalDecision | None = None
         self._approved_by: str | None = None
+        self._running_tool: str | None = None
 
     @workflow.run
     async def run(self, request: AgentRunRequest) -> AgentRunState:
+        try:
+            return await self._handle(request)
+        except (ActivityError, ChildWorkflowError) as error:
+            self._state.status = RunStatus.FAILED
+            if self._running_tool:
+                self._state.answer = f"I couldn't complete {self._running_tool}: {failure_reason(error)}"
+            else:
+                self._state.answer = UNAVAILABLE_ANSWER
+            return self._state
+
+    async def _handle(self, request: AgentRunRequest) -> AgentRunState:
         self._state.intent = await workflow.execute_activity(
             Activities.CLASSIFY,
             request.question,
@@ -110,10 +130,18 @@ class AgentRunWorkflow:
                         retry_policy=DEFAULT_RETRY,
                     )
                 return self._state
+            if not may_use(turn.tool_call.name, request.user.groups):
+                self._state.status = RunStatus.DENIED
+                self._state.answer = (
+                    f"You are not allowed to use {turn.tool_call.name}. Ask your manager or the IT helpdesk."
+                )
+                return self._state
             if turn.tool_call.requires_approval and not await self._await_approval(request, turn.tool_call, step):
                 self._state.status = RunStatus.DENIED
+                self._state.answer = "Your request was denied by an approver."
                 return self._state
             self._state.status = RunStatus.RUNNING
+            self._running_tool = turn.tool_call.name
             result = await workflow.execute_activity(
                 Activities.EXECUTE_TOOL,
                 ToolRequest(
