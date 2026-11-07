@@ -1,4 +1,4 @@
-export AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_REGION="${AWS_REGION:-us-east-2}"
 export ANTARA_NAME="${ANTARA_NAME:-antara}"
 export VPC_CIDR="${VPC_CIDR:-10.42.0.0/16}"
 export SUBNET_CIDR="${SUBNET_CIDR:-10.42.1.0/24}"
