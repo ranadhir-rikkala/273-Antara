@@ -22,6 +22,7 @@ from ingest.workflows import IngestWorkflow
 
 embedded_on_gpu: list[int] = []
 embedded_on_cpu: list[int] = []
+busy_attempts: list[int] = []
 failed_versions: list[str] = []
 
 
@@ -129,3 +130,39 @@ async def test_embedding_moves_to_cpu_when_the_gpu_lane_never_picks_it_up() -> N
     assert embedded_on_gpu == []
     assert sorted(embedded_on_cpu) == [6, 32, 32]
     assert result.offloaded_batches == 3
+
+
+@activity.defn(name=Activities.EMBED)
+async def busy_then_ok_embed(batch: EmbedBatch) -> int:
+    attempt = activity.info().attempt
+    busy_attempts.append(attempt)
+    if attempt <= 8:
+        raise ApplicationError("429 Too Many Requests", type="ModelBusy")
+    return len(batch.chunk_ids)
+
+
+@activity.defn(name=Activities.CHUNK)
+async def one_chunk(document: ExtractedDocument) -> ChunkedDocument:
+    return ChunkedDocument(document.version_id, ["only-chunk"])
+
+
+async def test_a_busy_model_delays_embedding_but_never_fails_the_document() -> None:
+    busy_attempts.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        cpu_worker = Worker(
+            env.client,
+            task_queue=INGEST_CPU,
+            workflows=[IngestWorkflow],
+            activities=[fake_extract, one_chunk, fake_select_queue, fake_publish, fake_mark_failed],
+        )
+        gpu_worker = Worker(env.client, task_queue=INGEST_GPU, activities=[busy_then_ok_embed])
+        async with cpu_worker, gpu_worker:
+            result = await env.client.execute_workflow(
+                Workflows.INGEST,
+                IngestRequest("doc-4", "ver-4", "originals/doc-4/ver-4/a.txt", "text/plain"),
+                id="ingest-ver-4",
+                task_queue=INGEST_CPU,
+                result_type=IngestResult,
+            )
+    assert result.status == VersionStatus.READY
+    assert max(busy_attempts) == 9

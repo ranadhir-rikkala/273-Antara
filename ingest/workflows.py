@@ -17,7 +17,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from common.names import Activities, Workflows
     from common.queues import INGEST_CPU, INGEST_GPU
-    from common.retry import DEFAULT_RETRY
+    from common.retry import DEFAULT_RETRY, PATIENT_DEADLINE, PATIENT_RETRY
 
 
 GPU_PICKUP_TIMEOUT = timedelta(seconds=20)
@@ -41,8 +41,9 @@ class IngestWorkflow:
                 result_type=int,
                 task_queue=queue,
                 schedule_to_start_timeout=GPU_PICKUP_TIMEOUT if queue == INGEST_GPU else None,
+                schedule_to_close_timeout=PATIENT_DEADLINE,
                 start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=DEFAULT_RETRY,
+                retry_policy=PATIENT_RETRY,
             )
         except ActivityError as error:
             if queue != INGEST_GPU or not never_picked_up(error):
