@@ -150,9 +150,13 @@ async def delete_document(document_id: str, client: Client = Depends(temporal)) 
 async def start_run(
     body: AskRequest, user: UserContext = Depends(current_user), client: Client = Depends(temporal)
 ) -> dict[str, str]:
+    try:
+        question = services.clean_question(body.question)
+    except services.InvalidQuestionError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     run_id = f"agent-{uuid.uuid4()}"
     await client.start_workflow(
-        Workflows.AGENT_RUN, AgentRunRequest(question=body.question, user=user), id=run_id, task_queue=AGENT
+        Workflows.AGENT_RUN, AgentRunRequest(question=question, user=user), id=run_id, task_queue=AGENT
     )
     return {"run_id": run_id}
 

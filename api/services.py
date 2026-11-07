@@ -8,6 +8,7 @@ APPROVER_GROUP = "managers"
 ESCALATION_GROUP = "security-leads"
 DEFAULT_TITLE = "document"
 DEFAULT_CONTENT_TYPE = "application/octet-stream"
+MAX_QUESTION_LENGTH = 2000
 
 
 class NotFoundError(Exception):
@@ -22,6 +23,10 @@ class ConflictError(Exception):
     pass
 
 
+class InvalidQuestionError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class DecisionOutcome:
     approval_id: str
@@ -31,6 +36,15 @@ class DecisionOutcome:
 
 def parse_groups(raw: str) -> list[str]:
     return [group.strip() for group in raw.split(",") if group.strip()]
+
+
+def clean_question(text: str) -> str:
+    question = text.strip()
+    if not question:
+        raise InvalidQuestionError("Ask a question or describe what you need")
+    if len(question) > MAX_QUESTION_LENGTH:
+        raise InvalidQuestionError(f"Keep questions under {MAX_QUESTION_LENGTH} characters")
+    return question
 
 
 def can_view_inbox(user: UserContext) -> bool:

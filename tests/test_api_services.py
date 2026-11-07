@@ -55,3 +55,10 @@ async def test_nobody_can_approve_their_own_request() -> None:
     with pytest.raises(services.ForbiddenError, match="own"):
         await services.decide("a1", CAROL, True, inbox)
     assert inbox.rows["a1"][1] == "PENDING"
+
+
+def test_questions_are_trimmed_and_must_be_reasonable_length() -> None:
+    assert services.clean_question("  How do I reset MFA?  ") == "How do I reset MFA?"
+    for bad in ("", "   ", "x" * (services.MAX_QUESTION_LENGTH + 1)):
+        with pytest.raises(services.InvalidQuestionError):
+            services.clean_question(bad)
