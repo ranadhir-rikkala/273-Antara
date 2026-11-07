@@ -27,3 +27,48 @@ async def test_gate_admits_under_limit() -> None:
     gate._checked_at = float("inf")
     await gate.admit(client=None)
     assert gate.rejected == 0
+
+
+class StatsClient:
+    def __init__(self, backlog: int, fail: bool = False) -> None:
+        self.backlog = backlog
+        self.fail = fail
+        self.calls = 0
+
+
+async def test_gate_refreshes_backlog_and_keeps_last_value_when_temporal_is_unreachable(monkeypatch) -> None:
+    from temporalio.service import RPCError, RPCStatusCode
+
+    from api import admission
+    from common.queue_stats import QueueStats
+
+    async def fake_stats(client: StatsClient, queue: str) -> QueueStats:
+        client.calls += 1
+        if client.fail:
+            raise RPCError("down", RPCStatusCode.UNAVAILABLE, b"")
+        return QueueStats(backlog=client.backlog, pollers=1)
+
+    monkeypatch.setattr(admission, "queue_stats", fake_stats)
+    gate = BacklogGate("agent", limit=100, refresh_seconds=0)
+    client = StatsClient(backlog=150)
+    with pytest.raises(HTTPException):
+        await gate.admit(client)
+    client.fail = True
+    assert await gate.current_backlog(client) == 150
+    cached = BacklogGate("agent", limit=100, refresh_seconds=60)
+    await cached.current_backlog(client)
+    await cached.current_backlog(client)
+    assert client.calls == 3
+
+
+async def test_inflight_limit_rejects_when_every_slot_is_taken() -> None:
+    from api.admission import InflightLimit
+
+    limit = InflightLimit(1)
+    holder = limit.hold()
+    await holder.__anext__()
+    with pytest.raises(HTTPException) as error:
+        await limit.hold().__anext__()
+    assert error.value.status_code == 429 and limit.rejected == 1
+    with pytest.raises(StopAsyncIteration):
+        await holder.__anext__()

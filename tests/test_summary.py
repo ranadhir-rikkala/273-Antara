@@ -9,3 +9,12 @@ def test_ticket_and_access_confirmations_come_from_tool_output() -> None:
         "Your read access to prod-db was granted after carol approved it."
     )
     assert "couldn't find" in summarize_tool_result("get_ticket_status", {"found": False})
+
+
+def test_found_ticket_status_and_unknown_tools_are_summarized() -> None:
+    found = {"found": True, "ticket_id": "t-1", "title": "Screen lock", "status": "OPEN"}
+    assert summarize_tool_result("get_ticket_status", found) == "Ticket t-1 (Screen lock) is OPEN."
+    assert summarize_tool_result("request_access", {"system": "vpn", "role": "user"}) == (
+        "Your user access to vpn was granted."
+    )
+    assert summarize_tool_result("future_tool", {}) == "Done: future_tool finished."
