@@ -1,5 +1,6 @@
+import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from agent.ports import ToolWorkspace
@@ -13,6 +14,43 @@ class ToolSpec:
     parameters: dict[str, Any]
     allowed_groups: frozenset[str]
     requires_approval: bool
+    clarify: dict[str, str] = field(default_factory=dict)
+    defaults: dict[str, Any] = field(default_factory=dict)
+    needs_description: bool = False
+
+
+FILLER_WORDS = frozenset(
+    {
+        "please",
+        "can",
+        "could",
+        "you",
+        "i",
+        "we",
+        "need",
+        "want",
+        "would",
+        "like",
+        "to",
+        "create",
+        "open",
+        "file",
+        "make",
+        "raise",
+        "log",
+        "a",
+        "an",
+        "the",
+        "new",
+        "for",
+        "me",
+        "my",
+        "ticket",
+        "tickets",
+        "help",
+    }
+)
+MIN_DESCRIPTION_WORDS = 3
 
 
 async def _create_ticket(workspace: ToolWorkspace, request: ToolRequest) -> dict[str, Any]:
@@ -59,6 +97,12 @@ REGISTRY: dict[str, ToolSpec] = {
             },
             allowed_groups=_EVERYONE,
             requires_approval=False,
+            clarify={
+                "title": "What is the problem? Describe what is broken and since when.",
+                "description": "What is the problem? Describe what is broken and since when.",
+            },
+            defaults={"priority": "medium"},
+            needs_description=True,
         ),
         ToolSpec(
             name="get_ticket_status",
@@ -70,6 +114,7 @@ REGISTRY: dict[str, ToolSpec] = {
             },
             allowed_groups=_EVERYONE,
             requires_approval=False,
+            clarify={"ticket_id": "What is the ticket ID?"},
         ),
         ToolSpec(
             name="request_access",
@@ -81,13 +126,17 @@ REGISTRY: dict[str, ToolSpec] = {
                 "type": "object",
                 "properties": {
                     "system": {"type": "string"},
-                    "role": {"type": "string"},
+                    "role": {"type": "string", "enum": ["read", "write"]},
                     "reason": {"type": "string"},
                 },
                 "required": ["system", "role"],
             },
             allowed_groups=frozenset({"employees", "managers"}),
             requires_approval=True,
+            clarify={
+                "system": "Which system do you need access to?",
+                "role": "Which access level do you need: read or write?",
+            },
         ),
     ]
 }
@@ -113,3 +162,34 @@ def schemas(names: list[str] | None = None) -> list[dict[str, Any]]:
 def may_use(tool: str, groups: list[str]) -> bool:
     spec = REGISTRY.get(tool)
     return spec is not None and bool(spec.allowed_groups.intersection(groups))
+
+
+def describes_problem(question: str) -> bool:
+    words = re.findall(r"[a-z']+", question.lower())
+    return sum(1 for word in words if word not in FILLER_WORDS) >= MIN_DESCRIPTION_WORDS
+
+
+def prepare_arguments(spec: ToolSpec, arguments: Any, question: str) -> tuple[dict[str, Any], list[str]]:
+    raw = arguments if isinstance(arguments, dict) else {}
+    args = {key: value.strip() if isinstance(value, str) else value for key, value in raw.items()}
+    lowered = question.lower()
+    for name, schema in spec.parameters["properties"].items():
+        choices = schema.get("enum")
+        if not choices or args.get(name) in choices:
+            continue
+        inferred = next((choice for choice in choices if re.search(rf"\b{choice}\b", lowered)), None)
+        if inferred is not None:
+            args[name] = inferred
+        elif name in spec.defaults:
+            args[name] = spec.defaults[name]
+        else:
+            args.pop(name, None)
+    missing = [name for name in spec.parameters.get("required", []) if not str(args.get(name, "")).strip()]
+    if spec.needs_description and not describes_problem(question) and "description" not in missing:
+        missing.append("description")
+    return args, missing
+
+
+def clarifying_question(spec: ToolSpec, missing: list[str]) -> str:
+    prompts = dict.fromkeys(spec.clarify.get(name, f"Please tell me the {name}.") for name in missing)
+    return " ".join(prompts)
