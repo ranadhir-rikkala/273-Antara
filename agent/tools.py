@@ -64,7 +64,10 @@ REGISTRY: dict[str, ToolSpec] = {
     for spec in [
         ToolSpec(
             name="create_ticket",
-            description="Create an IT or security helpdesk ticket for the current user.",
+            description=(
+                "Report a problem that IT must fix, such as broken hardware or software. "
+                "Never use it to request access."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
@@ -90,7 +93,10 @@ REGISTRY: dict[str, ToolSpec] = {
         ),
         ToolSpec(
             name="request_access",
-            description="Request access to an internal system. A manager must approve it before it is granted.",
+            description=(
+                "Request access to an internal system, database or tool. "
+                "Use it whenever the user asks for access. A manager approves it."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
