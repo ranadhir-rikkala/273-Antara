@@ -55,3 +55,16 @@ def test_clarifying_questions_name_what_is_missing() -> None:
 
     assert "read or write" in clarifying_question(REGISTRY["request_access"], ["role"])
     assert "Which system" in clarifying_question(REGISTRY["request_access"], ["system", "role"])
+
+
+def test_a_system_the_model_dropped_is_taken_from_the_users_words() -> None:
+    from agent.tools import REGISTRY, prepare_arguments
+
+    spec = REGISTRY["request_access"]
+    question = "I need read access to the production database for the billing migration"
+    args, missing = prepare_arguments(spec, {"role": "read"}, question)
+    assert args["system"] == "production database" and missing == []
+    args, missing = prepare_arguments(spec, {"system": "", "role": "write"}, "Can I get write access to Jira?")
+    assert args["system"] == "Jira" and missing == []
+    args, _ = prepare_arguments(spec, {"system": "billing db", "role": "read"}, "read access to the orders database")
+    assert args["system"] == "billing db"

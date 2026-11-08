@@ -17,7 +17,10 @@ class ToolSpec:
     clarify: dict[str, str] = field(default_factory=dict)
     defaults: dict[str, Any] = field(default_factory=dict)
     needs_description: bool = False
+    extract: dict[str, re.Pattern[str]] = field(default_factory=dict)
 
+
+ACCESS_TARGET = re.compile(r"access to (?:the |our )?(.+?)(?:\s+(?:for|so|because|since|to)\b|[.,?!]|$)", re.IGNORECASE)
 
 FILLER_WORDS = frozenset(
     {
@@ -133,6 +136,7 @@ REGISTRY: dict[str, ToolSpec] = {
             },
             allowed_groups=frozenset({"employees", "managers"}),
             requires_approval=True,
+            extract={"system": ACCESS_TARGET},
             clarify={
                 "system": "Which system do you need access to?",
                 "role": "Which access level do you need: read or write?",
@@ -184,6 +188,10 @@ def prepare_arguments(spec: ToolSpec, arguments: Any, question: str) -> tuple[di
             args[name] = spec.defaults[name]
         else:
             args.pop(name, None)
+    for name, pattern in spec.extract.items():
+        found = pattern.search(question)
+        if found and not str(args.get(name, "")).strip():
+            args[name] = found.group(1).strip()
     missing = [name for name in spec.parameters.get("required", []) if not str(args.get(name, "")).strip()]
     if spec.needs_description and not describes_problem(question) and "description" not in missing:
         missing.append("description")
