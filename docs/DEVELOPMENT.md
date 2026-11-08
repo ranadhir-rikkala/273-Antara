@@ -98,11 +98,40 @@ Everything in `common/` is shared by all four slices. Change it only after the t
 
 ## What each part does
 
+Each person owns one part: its code, its tests, its promises and its live demo moment. Commit your own work, in your own folders, under your own git name. Changes to someone else's part need a review from its owner.
+
 | Folder | Owner | Holds |
 | --- | --- | --- |
-| `agent/` | Ranadhir | Agent loop, triage router, incident storm dedup, answer cache, approvals with escalation, tool registry, effectively-once tool ledger |
-| `ingest/` | Prajval | Ingest workflow, CPU/GPU dispatcher, embedding fan-out, version publishing, permission-filtered search, deletion |
-| `deploy/` | Manoj | Compose for local; k3s manifests, KEDA, GPU and model serving, NetworkPolicies and AWS scripts |
-| `api/`, `gateway/`, `reconciler/` | Vinayak | API with backlog-based 429s, auth, web app; gateway limits, chaos flag and metrics; reconciler schedule |
+| `agent/`, `evals/` | Ranadhir | Agent loop, triage router, incident storm dedup, answer cache, approvals with escalation, tool registry, effectively-once tool ledger, model evals |
+| `ingest/`, `demo/` | Prajval | Ingest workflow, CPU/GPU dispatcher, embedding fan-out, version publishing, permission-filtered search, deletion, demo documents |
+| `api/` (except `api/ops/`), `gateway/`, `reconciler/` | Vinayak | API with backlog-based 429s, auth, helpdesk web app; gateway limits and metrics; reconciler schedule and repairs |
+| `deploy/`, `api/ops/`, `loadtest/`, `scripts/` | Manoj | Compose and k3s manifests, KEDA, GPU and model serving, NetworkPolicies, observability, AWS scripts; ops console, chaos actions and flood |
+
+Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes.py`, `AGENTS.md`.
+
+| Owner | Promises they present | Live demo moment |
+| --- | --- | --- |
+| Ranadhir | 1 async messaging, 5 reliable messaging, 7 failure recovery, effectively-once tools, incident fan-out/fan-in | Kill the agent worker mid-question; the answer still arrives |
+| Prajval | 6 retries, 10 GPU lane with CPU fallback, data lifecycle | Lose the GPU lane; a new document is still READY via CPU |
+| Vinayak | 3 load balancing, 4 backpressure, 8 state reconciliation | Flood: 429s from both API replicas and the model gateway; corrupt the index and watch it repair |
+| Manoj | 2 independent scaling (KEDA), 9 distributed monitoring | Worker pods scale out under the flood on the ops console, Grafana and Jaeger |
+
+### Next tasks by owner
+
+| Owner | Task |
+| --- | --- |
+| Ranadhir | Self-revoking access: a durable timer revokes grants after 30 or 7 days (compressed for the demo) |
+| Ranadhir | Incident command: status updates to reporters and auto-close |
+| Prajval | Put PDF reading behind an extractor port, so `ingest/services.py` no longer imports `pypdf` |
+| Prajval | Move the `QueueStats` type into `common/models.py`, so ingest ports and the dispatcher no longer import Temporal |
+| Prajval | Seed script that uploads `demo/policies/` with the right groups for each document |
+| Vinayak | Split the gateway into ports, services and adapters, so the model-busy rule has no HTTP code in it |
+| Vinayak | Move the load-gate rule out of `api/admission.py` into a service with a port for the load reading |
+| Vinayak | Demo UI: helpdesk and ops console side by side, with guided steps |
+| Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers |
+| Manoj | CI on GitHub Actions: `scripts/check.sh` on every push |
+| Manoj | `docs/DEMO.md` presenter script |
+
+Everyone shares the report and slides; each person writes the section for the promises they present. If you use an AI coding assistant, point it at [AGENTS.md](../AGENTS.md): business rules stay in `services.py` behind `ports.py`, and every outside system is reached through an adapter, so any component can be swapped later.
 
 AWS deployment steps are in [deploy/aws/README.md](../deploy/aws/README.md).
