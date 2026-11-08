@@ -3,8 +3,7 @@ from typing import Any
 import pytest
 
 from api.ops import services
-from common.models import UserContext
-from common.queue_stats import QueueStats
+from common.models import QueueStats, UserContext
 
 
 class Queues:

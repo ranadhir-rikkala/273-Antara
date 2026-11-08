@@ -40,6 +40,12 @@ class UserContext:
     groups: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class QueueStats:
+    backlog: int
+    pollers: int
+
+
 @dataclass
 class ChunkResult:
     document_id: str

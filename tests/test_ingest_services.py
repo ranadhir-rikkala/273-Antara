@@ -9,10 +9,10 @@ from common.models import (
     ExtractedDocument,
     IngestRequest,
     MarkFailedRequest,
+    QueueStats,
     UserContext,
     VersionStatus,
 )
-from common.queue_stats import QueueStats
 from common.queues import INGEST_CPU, INGEST_GPU
 from ingest import services
 from tests.fakes import (

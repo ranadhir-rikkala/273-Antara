@@ -1,15 +1,9 @@
-from dataclasses import dataclass
-
 from temporalio.api.enums.v1 import TaskQueueType
 from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeTaskQueueRequest
 from temporalio.client import Client
 
-
-@dataclass(frozen=True)
-class QueueStats:
-    backlog: int
-    pollers: int
+from common.models import QueueStats
 
 
 async def queue_stats(

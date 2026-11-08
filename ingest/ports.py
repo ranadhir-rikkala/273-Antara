@@ -2,8 +2,7 @@ from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Protocol
 
-from common.models import ChunkResult
-from common.queue_stats import QueueStats
+from common.models import ChunkResult, QueueStats
 
 
 class ObjectStore(Protocol):

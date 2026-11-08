@@ -4,8 +4,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
-from common.models import CachedAnswer, ChunkResult, IncidentResult, IngestRequest, ToolCall
-from common.queue_stats import QueueStats
+from common.models import CachedAnswer, ChunkResult, IncidentResult, IngestRequest, QueueStats, ToolCall
 
 VOCABULARY = ("vpn", "down", "password", "laptop", "access", "database", "printer", "salary")
 

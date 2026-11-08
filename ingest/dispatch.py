@@ -1,4 +1,4 @@
-from common.queue_stats import QueueStats
+from common.models import QueueStats
 from common.queues import INGEST_CPU, INGEST_GPU
 
 

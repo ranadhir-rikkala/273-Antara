@@ -40,7 +40,7 @@ async def test_gate_refreshes_backlog_and_keeps_last_value_when_temporal_is_unre
     from temporalio.service import RPCError, RPCStatusCode
 
     from api import admission
-    from common.queue_stats import QueueStats
+    from common.models import QueueStats
 
     async def fake_stats(client: StatsClient, queue: str) -> QueueStats:
         client.calls += 1

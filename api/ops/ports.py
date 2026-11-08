@@ -1,6 +1,6 @@
 from typing import Any, Protocol
 
-from common.queue_stats import QueueStats
+from common.models import QueueStats
 
 
 class QueueReader(Protocol):
