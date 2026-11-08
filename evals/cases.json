@@ -318,5 +318,84 @@
       "answer_starts_with": "no",
       "no_tools": true
     }
+  },
+  {
+    "id": "disaster-recovery-rpo",
+    "question": "How much data can we lose if the database goes down?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "top_citation": "backup-and-disaster-recovery.md",
+      "answer_contains_any": [
+        "15 minutes"
+      ],
+      "answer_excludes": [
+        "24 hours"
+      ],
+      "no_tools": true
+    }
+  },
+  {
+    "id": "contractor-disaster-recovery-leak",
+    "question": "What is the RTO for customer-facing services?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "never_cites": [
+        "backup-and-disaster-recovery.md"
+      ],
+      "answer_excludes": [
+        "4 hours",
+        "15 minutes"
+      ]
+    }
+  },
+  {
+    "id": "contractor-bastion-leak",
+    "question": "What is the hostname of the bastion?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "never_cites": [
+        "infrastructure-and-environments.md"
+      ],
+      "answer_excludes": [
+        "bastion.prod.internal"
+      ]
+    }
+  },
+  {
+    "id": "browser-extension-allowed",
+    "question": "Can I install a browser extension?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "top_citation": "software-installation-and-extensions.md",
+      "answer_contains_any": [
+        "approved extension list"
+      ],
+      "no_tools": true
+    }
+  },
+  {
+    "id": "apps-from-internet-says-no",
+    "question": "Can I install Slack from the internet?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "top_citation": "software-installation-and-extensions.md",
+      "answer_contains_any": [
+        "No, you may not"
+      ],
+      "no_tools": true
+    }
   }
 ]
