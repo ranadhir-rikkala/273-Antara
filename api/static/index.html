@@ -4,146 +4,258 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Antara Helpdesk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect x='1.5' y='1.5' width='27' height='27' rx='3' fill='none' stroke='%231f5a48' stroke-width='2' stroke-dasharray='3 2.5'/%3E%3Crect x='9' y='9' width='12' height='12' rx='1.5' fill='%231f5a48'/%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5d6675; --line: #dfe3ea;
-    --accent: #2357d9; --accent-ink: #ffffff; --good: #1d7a46; --warn: #a15c00; --bad: #b42318; --chip: #eef2fb;
+    --paper: #f3f0e8; --panel: #fbfaf6; --ink: #1b1d1a; --soft: #4a4e47; --muted: #7a7e75; --line: #dcd7ca; --hair: #e8e4d8;
+    --vault: #1f5a48; --vault-ink: #f3f0e8; --vault-tint: #e2ebe5; --amber: #9a5b0b; --amber-tint: #f4e8d3;
+    --brick: #a3321f; --brick-tint: #f5e1dc; --good: #2f6f3e;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #12151b; --panel: #1b2029; --ink: #e7eaf0; --muted: #9aa3b2; --line: #2c333f;
-      --accent: #6f95ff; --accent-ink: #0d1220; --good: #5fcf8f; --warn: #f2b45a; --bad: #ff7a6e; --chip: #232b3a;
+      --paper: #121412; --panel: #191c19; --ink: #e9e6dc; --soft: #c2c0b6; --muted: #8d9088; --line: #2e322d; --hair: #242824;
+      --vault: #7fc4a6; --vault-ink: #0f1a15; --vault-tint: #1c2b24; --amber: #e3ad5c; --amber-tint: #2c2416;
+      --brick: #ef8a75; --brick-tint: #2e1c18; --good: #8fd19e;
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px;
-           background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header h1 { margin: 0; font-size: 18px; }
-  header small { color: var(--muted); }
-  main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
-  section h2 { margin: 0 0 12px; font-size: 15px; }
-  label { font-size: 13px; color: var(--muted); }
-  select, input[type=text], textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
-           background: var(--bg); color: var(--ink); font: inherit; }
-  textarea { resize: vertical; min-height: 64px; }
-  button { padding: 8px 14px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: inherit; cursor: pointer; }
-  button.secondary { background: var(--chip); color: var(--ink); }
-  button.danger { background: var(--bad); color: #fff; }
-  button:disabled { opacity: .5; cursor: default; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .grow { flex: 1; min-width: 0; }
-  .samples { display: grid; gap: 8px; margin-top: 12px; }
-  .sample { font-size: 13px; padding: 6px 10px; text-align: left; }
-  .sample .aud { display: block; font-size: 11px; color: var(--muted); }
-  .chat { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
-  .msg { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }
-  .msg.user { align-self: flex-end; background: var(--chip); max-width: 80%; }
-  .msg.bot { background: var(--bg); }
-  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); font-size: 12px; }
-  .chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
-  .cite { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; margin-top: 6px; }
-  .cite.strong { color: var(--ink); border-left-color: var(--accent); }
-  .sources { margin-top: 8px; }
-  .sources summary { cursor: pointer; font-size: 12px; color: var(--accent); width: fit-content; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; }
-  .empty { color: var(--muted); font-size: 13px; }
-  .error { color: var(--bad); font-size: 13px; min-height: 18px; }
+  html { background: var(--paper); }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--vault); text-underline-offset: 3px; }
+  button, input, select { font: inherit; color: inherit; }
+  .label { font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  .top { border-bottom: 1px solid var(--line); background: var(--panel); }
+  .top-inner { max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+  .brand svg { flex: none; color: var(--vault); }
+  .brand h1 { margin: 0; font: 600 22px/1 var(--serif); letter-spacing: -.01em; }
+  .brand p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+  .perimeter { display: inline-flex; align-items: center; gap: 7px; font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+               color: var(--vault); border: 1px solid var(--vault); border-radius: 3px; padding: 6px 9px; }
+  .perimeter i { width: 6px; height: 6px; border-radius: 50%; background: var(--vault); }
+  .identity { display: flex; align-items: center; gap: 10px; }
+  .identity select { appearance: none; border: 1px solid var(--line); background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237a7e75' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+                     border-radius: 4px; padding: 7px 30px 7px 10px; cursor: pointer; }
+  .opslink { font-size: 13px; }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 48px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; gap: 28px; padding: 20px 16px 40px; } .top-inner { padding: 12px 16px; } }
+
+  .conversation { display: flex; flex-direction: column; min-width: 0; }
+  .lede { margin: 0 0 18px; }
+  .lede h2 { margin: 0; font: 500 28px/1.2 var(--serif); letter-spacing: -.015em; }
+  .lede p { margin: 6px 0 0; color: var(--soft); max-width: 60ch; }
+
+  .chat { display: flex; flex-direction: column; gap: 18px; max-height: 58vh; overflow-y: auto; padding: 4px 2px 8px; }
+  .chat:empty { display: none; }
+  .msg { max-width: 100%; }
+  .msg.user { align-self: flex-end; max-width: 78%; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 14px 14px 3px 14px; }
+  .msg.bot { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+  .msg.bot .mark { width: 28px; height: 28px; border-radius: 50%; background: var(--vault-tint); color: var(--vault); display: grid; place-items: center; }
+  .answer { white-space: pre-wrap; }
+  .working { color: var(--muted); }
+  .working::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  @media (prefers-reduced-motion: reduce) { .working::after { animation: none; content: "..."; } }
+
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip { font: 500 10.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; padding: 5px 7px; border-radius: 3px;
+          border: 1px solid var(--line); color: var(--muted); background: transparent; }
+  .chip.good { color: var(--good); border-color: currentColor; }
+  .chip.warn { color: var(--amber); background: var(--amber-tint); border-color: transparent; }
+  .chip.bad { color: var(--brick); background: var(--brick-tint); border-color: transparent; }
+
+  .sources { margin-top: 10px; border-top: 1px solid var(--hair); padding-top: 8px; }
+  .sources summary { cursor: pointer; font-size: 12.5px; color: var(--soft); list-style: none; display: inline-flex; gap: 6px; align-items: center; }
+  .sources summary::-webkit-details-marker { display: none; }
+  .sources summary::before { content: "›"; display: inline-block; transition: transform .15s; color: var(--muted); }
+  .sources[open] summary::before { transform: rotate(90deg); }
+  .cite { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--hair); font-size: 13px; }
+  .cite:last-child { border-bottom: 0; }
+  .cite b { font: 500 11px/1.6 var(--mono); color: var(--muted); }
+  .cite .doc { font-weight: 600; }
+  .cite .why { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; color: var(--muted); }
+  .cite.strong .why { color: var(--vault); }
+  .cite p { margin: 3px 0 0; color: var(--soft); }
+
+  .composer { margin-top: 16px; display: flex; gap: 0; border: 1px solid var(--ink); border-radius: 6px; background: var(--panel); overflow: hidden; }
+  .composer:focus-within { box-shadow: 0 0 0 3px var(--vault-tint); border-color: var(--vault); }
+  .composer input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 13px 14px; outline: none; }
+  .composer button { border: 0; background: var(--ink); color: var(--paper); padding: 0 20px; cursor: pointer; font-weight: 600; }
+  .composer button:hover { background: var(--vault); color: var(--vault-ink); }
+  .error { color: var(--brick); font-size: 13px; min-height: 20px; margin-top: 6px; }
+
+  .clearance { margin-top: 22px; }
+  .clearance-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .clearance-head p { margin: 0; font-size: 13px; color: var(--muted); }
+  .tiers { display: grid; gap: 14px; }
+  .tier { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; }
+  @media (max-width: 640px) { .tier { grid-template-columns: 1fr; gap: 6px; } }
+  .tier > .label { padding-top: 9px; }
+  .prompts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sample { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 4px;
+            padding: 7px 11px; cursor: pointer; font-size: 13.5px; text-align: left; transition: border-color .12s, background .12s; }
+  .sample:hover { border-color: var(--ink); }
+  .sample .lock { flex: none; color: var(--vault); }
+  .sample.locked { color: var(--muted); background: transparent; border-style: dashed; }
+  .sample.locked .lock { color: var(--brick); }
+  .sample .note { font: 500 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .everyday { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hair); flex-wrap: wrap; }
+  .everyday select { appearance: none; border: 1px solid var(--line); background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237a7e75' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+                     border-radius: 4px; padding: 7px 30px 7px 10px; cursor: pointer; max-width: 100%; }
+
+  aside { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+  .block h3 { margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  .block h3 span:first-child { font: 600 17px/1.2 var(--serif); }
+  .inbox-item { border-left: 3px solid var(--amber); background: var(--panel); padding: 10px 12px; margin-bottom: 10px; }
+  .inbox-item .who { font-weight: 600; }
+  .inbox-item .why { font-size: 13px; color: var(--soft); margin-top: 2px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn.quiet { background: transparent; color: var(--ink); }
+  .btn.deny { background: transparent; color: var(--brick); border-color: var(--brick); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .doclist { list-style: none; margin: 0; padding: 0 6px 0 0; border-top: 1px solid var(--line); max-height: 46vh; overflow-y: auto; }
+  .doclist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 9px 0; border-bottom: 1px solid var(--hair); align-items: center; }
+  .doclist .title { font-size: 13.5px; overflow-wrap: anywhere; }
+  .doclist .groups { grid-column: 1; font: 500 10.5px/1.3 var(--mono); color: var(--muted); }
+  .doclist .side { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: 8px; }
+  .remove { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 3px; line-height: 0; }
+  .remove:hover { color: var(--brick); background: var(--brick-tint); }
+  .upload summary { cursor: pointer; font-size: 13.5px; color: var(--vault); font-weight: 600; list-style: none; }
+  .upload summary::-webkit-details-marker { display: none; }
+  .upload form { margin-top: 12px; display: grid; gap: 10px; }
+  .upload input[type=text] { width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 8px 10px; }
+  .upload input[type=file] { font-size: 13px; max-width: 100%; }
+  .empty { color: var(--muted); font-size: 13.5px; }
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>Antara Helpdesk</h1>
-    <small>Private IT and security assistant. Nothing leaves the network. · <a href="/ops">Operations console</a></small>
-  </div>
-  <div class="row" id="account" hidden>
-    <span id="signed-in"></span>
-    <button id="logout" class="secondary" type="button">Sign out</button>
-  </div>
-  <div class="row" id="picker">
-    <label for="who">Signed in as</label>
-    <select id="who" style="width:auto">
-      <option value="alice|employees">alice (employee)</option>
-      <option value="bob|contractors">bob (contractor)</option>
-      <option value="carol|managers,employees">carol (manager)</option>
-      <option value="dave|security-leads,employees">dave (security lead)</option>
-    </select>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1.5" y="1.5" width="27" height="27" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2.5"/><rect x="9" y="9" width="12" height="12" rx="1.5" fill="currentColor"/></svg>
+      <div>
+        <h1>Antara</h1>
+        <p>Private IT &amp; security helpdesk</p>
+      </div>
+    </div>
+    <span class="perimeter" title="Models, documents and answers stay inside the company network"><i></i>Inside the network</span>
+    <div class="identity" id="account" hidden>
+      <span id="signed-in"></span>
+      <button id="logout" class="btn quiet" type="button">Sign out</button>
+    </div>
+    <div class="identity" id="picker">
+      <label class="label" for="who">Viewing as</label>
+      <select id="who">
+        <option value="alice|employees">alice · employee</option>
+        <option value="bob|contractors">bob · contractor</option>
+        <option value="carol|managers,employees">carol · manager</option>
+        <option value="dave|security-leads,employees">dave · security lead</option>
+      </select>
+    </div>
+    <a class="opslink" href="/ops">Operations console →</a>
   </div>
 </header>
 <main>
-  <div>
-    <section>
-      <h2>Ask the helpdesk</h2>
-      <div id="chat" class="chat"><div class="empty">Ask about sensitive internal information. Each person sees only what their groups allow, and nothing leaves the network.</div></div>
-      <form id="ask" class="row">
-        <input id="question" type="text" class="grow" placeholder="e.g. What is the API rate limit for the Pro tier?" autocomplete="off">
-        <button type="submit">Send</button>
-      </form>
-      <div class="samples">
-        <label>Sensitive information: switch the person above and ask again to compare</label>
-        <div class="row">
-          <button type="button" class="secondary sample" data-q="What is the API rate limit for the Pro tier?">API rate limits <span class="aud">employees</span></button>
-          <button type="button" class="secondary sample" data-q="What fraud risk score blocks a transaction?">Fraud thresholds <span class="aud">employees</span></button>
-          <button type="button" class="secondary sample" data-q="How much data can we lose if the database goes down?">Disaster recovery <span class="aud">employees</span></button>
-          <button type="button" class="secondary sample" data-q="How do I get into the prod cluster?">Prod cluster access <span class="aud">employees</span></button>
-          <button type="button" class="secondary sample" data-q="What is the salary band for L4 engineers?">Salary bands <span class="aud">employees, managers</span></button>
-          <button type="button" class="secondary sample" data-q="Which open vulnerability is critical and how fast must it be patched?">Embargoed vulnerabilities <span class="aud">security leads</span></button>
-          <button type="button" class="secondary sample" data-q="What is the payments webhook signing key?">Signing key <span class="aud">security leads, always redacted</span></button>
-          <button type="button" class="secondary sample" data-q="Can I paste our source code into a public AI chatbot?">Source code and public AI <span class="aud">everyone</span></button>
+  <section class="conversation">
+    <div class="lede">
+      <h2>Ask about anything internal.</h2>
+      <p>Answers come only from documents your groups can read, with sources. Secrets are redacted, and every question stays on company hardware.</p>
+    </div>
+    <div id="chat" class="chat"></div>
+    <form id="ask" class="composer">
+      <input id="question" type="text" placeholder="Ask a question, request access, or report a problem" autocomplete="off" aria-label="Question">
+      <button type="submit">Ask</button>
+    </form>
+    <div id="ask-error" class="error"></div>
+
+    <div class="clearance">
+      <div class="clearance-head">
+        <span class="label">Try a sensitive question</span>
+        <p>Switch who you are viewing as, then ask again.</p>
+      </div>
+      <div class="tiers">
+        <div class="tier">
+          <span class="label">Everyone</span>
+          <div class="prompts">
+            <button type="button" class="sample" data-groups="employees,contractors,managers,security-leads" data-q="Can I paste our source code into a public AI chatbot?">Source code and public AI</button>
+          </div>
         </div>
-        <div class="row">
-          <label for="helpdesk-samples">Helpdesk examples</label>
-          <select id="helpdesk-samples" style="width:auto">
-            <option value="">Choose a question…</option>
-            <option>How do contractors get VPN access?</option>
-            <option>How often do standard account passwords have to be rotated?</option>
-            <option>Can I deploy to production on a Friday?</option>
-            <option>I got a weird email asking me to click a link, what do I do?</option>
-            <option>How do I get access to GitHub?</option>
-            <option>Can I install Slack from the internet?</option>
-            <option>How quickly must on-call respond to a SEV1?</option>
-            <option>I need read access to the production database for the billing migration</option>
-            <option>Please create a ticket: my laptop screen does not lock after 5 minutes</option>
-            <option>The VPN is down for me since this morning</option>
-          </select>
+        <div class="tier">
+          <span class="label">Employees</span>
+          <div class="prompts">
+            <button type="button" class="sample" data-groups="employees,managers,security-leads" data-q="What is the API rate limit for the Pro tier?">API rate limits</button>
+            <button type="button" class="sample" data-groups="employees,managers,security-leads" data-q="What fraud risk score blocks a transaction?">Fraud thresholds</button>
+            <button type="button" class="sample" data-groups="employees,managers,security-leads" data-q="How much data can we lose if the database goes down?">Disaster recovery</button>
+            <button type="button" class="sample" data-groups="employees,managers,security-leads" data-q="How do I get into the prod cluster?">Prod cluster access</button>
+            <button type="button" class="sample" data-groups="employees,managers" data-q="What is the salary band for L4 engineers?">Salary bands</button>
+          </div>
+        </div>
+        <div class="tier">
+          <span class="label">Security leads</span>
+          <div class="prompts">
+            <button type="button" class="sample" data-groups="security-leads" data-q="Which open vulnerability is critical and how fast must it be patched?">Embargoed vulnerabilities</button>
+            <button type="button" class="sample" data-groups="security-leads" data-note="redacted" data-q="What is the payments webhook signing key?">Signing key</button>
+          </div>
         </div>
       </div>
-      <div id="ask-error" class="error"></div>
-    </section>
-  </div>
-  <div>
-    <section id="inbox-section" hidden>
-      <h2>Approvals inbox</h2>
+      <div class="everyday">
+        <label class="label" for="helpdesk-samples">Everyday helpdesk</label>
+        <select id="helpdesk-samples">
+          <option value="">Choose a question…</option>
+          <option>How do contractors get VPN access?</option>
+          <option>How often do standard account passwords have to be rotated?</option>
+          <option>Can I deploy to production on a Friday?</option>
+          <option>I got a weird email asking me to click a link, what do I do?</option>
+          <option>How do I get access to GitHub?</option>
+          <option>Can I install Slack from the internet?</option>
+          <option>How quickly must on-call respond to a SEV1?</option>
+          <option>I need read access to the production database for the billing migration</option>
+          <option>Please create a ticket: my laptop screen does not lock after 5 minutes</option>
+          <option>The VPN is down for me since this morning</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="block" id="inbox-section" hidden>
+      <h3><span>Waiting for your approval</span></h3>
       <div id="inbox"></div>
-    </section>
-    <section>
-      <h2>Upload a document</h2>
-      <form id="upload">
-        <input id="file" type="file" accept=".pdf,.txt,.md" required>
-        <div style="margin-top:8px"><label for="acl">Who can read it (groups)</label>
-          <input id="acl" type="text" value="employees,contractors"></div>
-        <div class="row" style="margin-top:10px"><button type="submit">Upload</button></div>
-      </form>
-      <div id="upload-error" class="error"></div>
-    </section>
-    <section>
-      <h2>Documents</h2>
+    </div>
+    <div class="block">
+      <h3><span>Documents you can read</span><span class="label" id="doc-count"></span></h3>
       <div id="docs"></div>
-    </section>
-  </div>
+    </div>
+    <div class="block">
+      <details class="upload">
+        <summary>+ Add a document</summary>
+        <form id="upload">
+          <input id="file" type="file" accept=".pdf,.txt,.md" required>
+          <div>
+            <label class="label" for="acl">Who can read it</label>
+            <input id="acl" type="text" value="employees,contractors">
+          </div>
+          <div><button class="btn" type="submit">Upload</button></div>
+        </form>
+        <div id="upload-error" class="error"></div>
+      </details>
+    </div>
+  </aside>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED"]);
 const conversation = [];
 const STRONG_MATCH = 0.6;
+const docTitles = new Map();
+const SVG = "http://www.w3.org/2000/svg";
 
 const auth = { mode: "headers", issuer: "", clientId: "", token: null, refresh: null, claims: null };
 
@@ -247,7 +359,7 @@ async function api(path, options = {}) {
     const retry = response.headers.get("Retry-After");
     let detail = response.statusText;
     try { detail = (await response.json()).detail || detail; } catch (_) {}
-    throw new Error(response.status === 429 ? `Busy: ${detail}. Retry in ${retry}s.` : detail);
+    throw new Error(response.status === 429 ? `Antara is busy: ${detail}. Try again in ${retry}s.` : detail);
   }
   return response.status === 204 ? null : response.json();
 }
@@ -261,14 +373,48 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+function icon(path, size = 14, cls = "") {
+  const svg = document.createElementNS(SVG, "svg");
+  if (cls) svg.setAttribute("class", cls);
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", size);
+  svg.setAttribute("height", size);
+  svg.setAttribute("aria-hidden", "true");
+  const shape = document.createElementNS(SVG, "path");
+  shape.setAttribute("d", path);
+  shape.setAttribute("fill", "none");
+  shape.setAttribute("stroke", "currentColor");
+  shape.setAttribute("stroke-width", "1.5");
+  shape.setAttribute("stroke-linecap", "round");
+  shape.setAttribute("stroke-linejoin", "round");
+  svg.append(shape);
+  return svg;
+}
+
+const ICONS = {
+  open: "M4 7V5a4 4 0 0 1 7.5-2M3 7h10v7H3z",
+  locked: "M5 7V5a3 3 0 0 1 6 0v2M3 7h10v7H3z",
+  mark: "M3 3h10v10H3zM6 6h4v4H6z",
+  trash: "M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5",
+};
+
 function statusChip(state) {
   const kind = { COMPLETED: "good", DENIED: "bad", FAILED: "bad", EXPIRED: "bad", ESCALATED: "warn", WAITING_APPROVAL: "warn" }[state.status] || "";
   return el("span", { class: `chip ${kind}` }, state.status.replace("_", " ").toLowerCase());
 }
 
+function botShell() {
+  const body = el("div", {}, el("div", { class: "answer working" }, "Searching your documents"));
+  const node = el("div", { class: "msg bot" }, el("span", { class: "mark" }, icon(ICONS.mark, 14)), body);
+  node.body = body;
+  return node;
+}
+
 function renderBot(node, state) {
-  node.replaceChildren();
-  node.append(el("div", {}, state.answer || (terminal.has(state.status) ? "No answer." : "Working on it...")));
+  const body = node.body;
+  body.replaceChildren();
+  const waiting = !state.answer && !terminal.has(state.status);
+  body.append(el("div", { class: `answer${waiting ? " working" : ""}` }, state.answer || (waiting ? "Searching your documents" : "No answer.")));
   const meta = el("div", { class: "meta" }, statusChip(state));
   if (state.intent) meta.append(el("span", { class: "chip" }, state.intent));
   if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
@@ -277,18 +423,23 @@ function renderBot(node, state) {
   for (const flag of state.flags || []) meta.append(el("span", { class: "chip warn" }, `guard: ${flag.replaceAll("-", " ")}`));
   if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
   for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
-  node.append(meta);
+  body.append(meta);
   const citations = state.citations || [];
-  if (!citations.length) return;
   const strong = citations.filter((cite) => cite.score >= STRONG_MATCH).length;
+  if (!strong || !state.answer) return;
   const sources = el("details", { class: "sources" },
-    el("summary", {}, strong ? `Sources (${strong} strong match${strong > 1 ? "es" : ""}, ${citations.length - strong} related)` : `Sources (${citations.length} related)`));
+    el("summary", {}, `${strong} strong source${strong > 1 ? "s" : ""}, ${citations.length - strong} related`));
   citations.forEach((cite, index) => {
-    const label = cite.score >= STRONG_MATCH ? "strong match" : "related";
-    sources.append(el("div", { class: `cite ${cite.score >= STRONG_MATCH ? "strong" : ""}` },
-      `[${index + 1}] ${label} · p.${cite.page_number} · ${cite.text.slice(0, 180)}${cite.text.length > 180 ? "…" : ""}`));
+    const isStrong = cite.score >= STRONG_MATCH;
+    const title = readable(docTitles.get(cite.document_id) || "Document");
+    sources.append(el("div", { class: `cite${isStrong ? " strong" : ""}` },
+      el("b", {}, `[${index + 1}]`),
+      el("div", {},
+        el("span", { class: "doc" }, title),
+        el("span", { class: "why" }, isStrong ? "strong match" : "related"),
+        el("p", {}, `${cite.text.slice(0, 200)}${cite.text.length > 200 ? "…" : ""}`))));
   });
-  node.append(sources);
+  body.append(sources);
 }
 
 async function poll(runId, node) {
@@ -296,6 +447,7 @@ async function poll(runId, node) {
     try {
       const state = await api(`/agent/runs/${runId}`);
       renderBot(node, state);
+      $("chat").scrollTop = $("chat").scrollHeight;
       if (terminal.has(state.status)) return state;
     } catch (_) {}
     await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -308,9 +460,8 @@ $("ask").addEventListener("submit", async (event) => {
   if (!question) return;
   $("ask-error").textContent = "";
   const chat = $("chat");
-  chat.querySelector(".empty")?.remove();
   chat.append(el("div", { class: "msg user" }, question));
-  const bot = el("div", { class: "msg bot" }, "Working on it...");
+  const bot = botShell();
   chat.append(bot);
   chat.scrollTop = chat.scrollHeight;
   $("question").value = "";
@@ -347,18 +498,35 @@ async function loadDocs() {
   const box = $("docs");
   try {
     const docs = await api("/documents");
-    if (!docs.length) { box.replaceChildren(el("div", { class: "empty" }, "No documents you can read yet.")); return; }
-    const table = el("table", {}, el("tr", {}, el("th", {}, "Title"), el("th", {}, "Status"), el("th", {}, "")));
+    for (const doc of docs) docTitles.set(doc.document_id, doc.title);
+    $("doc-count").textContent = docs.length ? String(docs.length) : "";
+    if (!docs.length) { box.replaceChildren(el("div", { class: "empty" }, "Nothing you can read yet.")); return; }
+    const list = el("ul", { class: "doclist" });
     for (const doc of docs) {
-      const remove = el("button", { class: "secondary" }, "Delete");
+      const remove = el("button", { class: "remove", title: `Delete ${doc.title}`, "aria-label": `Delete ${doc.title}` }, icon(ICONS.trash, 14));
       remove.addEventListener("click", async () => { await api(`/documents/${doc.document_id}`, { method: "DELETE" }); loadDocs(); });
       const kind = { READY: "good", FAILED: "bad" }[doc.status] || "warn";
-      table.append(el("tr", {}, el("td", {}, doc.title), el("td", {}, el("span", { class: `chip ${kind}` }, doc.status.toLowerCase())), el("td", {}, remove)));
+      const side = el("span", { class: "side" });
+      if (doc.status !== "READY") side.append(el("span", { class: `chip ${kind}` }, doc.status.toLowerCase()));
+      side.append(remove);
+      list.append(el("li", {},
+        el("span", { class: "title" }, readable(doc.title)),
+        side,
+        el("span", { class: "groups" }, audience(doc.groups || []))));
     }
-    box.replaceChildren(table);
+    box.replaceChildren(list);
   } catch (error) {
     box.replaceChildren(el("div", { class: "error" }, error.message));
   }
+}
+
+function readable(title) {
+  return title.replace(/\.(md|txt|pdf)$/, "").replaceAll("-", " ");
+}
+
+function audience(groups) {
+  if (groups.includes("contractors") && groups.includes("employees")) return "everyone";
+  return groups.map((group) => group.replace("-", "\u2011")).join(" · ");
 }
 
 async function loadInbox() {
@@ -369,10 +537,10 @@ async function loadInbox() {
   const box = $("inbox");
   try {
     const items = await api("/approvals");
-    if (!items.length) { box.replaceChildren(el("div", { class: "empty" }, "Nothing waiting for you.")); return; }
+    if (!items.length) { box.replaceChildren(el("div", { class: "empty" }, "Nothing is waiting for you.")); return; }
     box.replaceChildren(...items.map((item) => {
-      const approve = el("button", {}, "Approve");
-      const deny = el("button", { class: "danger" }, "Deny");
+      const approve = el("button", { class: "btn" }, "Approve");
+      const deny = el("button", { class: "btn deny" }, "Deny");
       const decide = (approved) => async () => {
         approve.disabled = deny.disabled = true;
         try {
@@ -384,13 +552,28 @@ async function loadInbox() {
       };
       approve.addEventListener("click", decide(true));
       deny.addEventListener("click", decide(false));
-      return el("div", { class: "msg bot", style: "margin-bottom:8px" },
-        el("div", {}, `${item.requester_id} wants ${item.role} on ${item.system}`),
-        el("div", { class: "meta" }, item.reason || "No reason given", item.escalated ? el("span", { class: "chip warn" }, "escalated") : ""),
-        el("div", { class: "row", style: "margin-top:8px" }, approve, deny));
+      const meta = el("div", { class: "meta" });
+      if (item.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
+      return el("div", { class: "inbox-item" },
+        el("div", { class: "who" }, `${item.requester_id} · ${item.role} access`),
+        el("div", { class: "why" }, `${item.system}${item.reason ? ` — ${item.reason}` : ""}`),
+        meta,
+        el("div", { class: "actions" }, approve, deny));
     }));
   } catch (error) {
     box.replaceChildren(el("div", { class: "error" }, error.message));
+  }
+}
+
+function markClearance() {
+  const mine = identity().groups.split(",");
+  for (const button of document.querySelectorAll(".sample")) {
+    const allowed = button.dataset.groups.split(",").some((group) => mine.includes(group));
+    button.classList.toggle("locked", !allowed);
+    const note = !allowed ? "locked" : button.dataset.note || "";
+    button.replaceChildren(icon(allowed ? ICONS.open : ICONS.locked, 14, "lock"), button.dataset.label);
+    if (note) button.append(el("span", { class: "note" }, note));
+    button.title = allowed ? "Your groups can read this" : "Your groups cannot read this. Antara will say it found nothing.";
   }
 }
 
@@ -398,14 +581,18 @@ function askSample(question) {
   $("question").value = question;
   $("ask").requestSubmit();
 }
-for (const button of document.querySelectorAll(".sample")) button.addEventListener("click", () => askSample(button.dataset.q));
+for (const button of document.querySelectorAll(".sample")) {
+  button.dataset.label = button.textContent.trim();
+  button.addEventListener("click", () => askSample(button.dataset.q));
+}
 $("helpdesk-samples").addEventListener("change", (event) => {
   if (event.target.value) askSample(event.target.value);
   event.target.value = "";
 });
-$("who").addEventListener("change", () => { conversation.length = 0; loadDocs(); loadInbox(); });
+$("who").addEventListener("change", () => { conversation.length = 0; markClearance(); loadDocs(); loadInbox(); });
 startAuth().then(() => {
   if (auth.mode === "oidc" && !auth.token) return;
+  markClearance();
   loadDocs();
   loadInbox();
   setInterval(() => { loadDocs(); loadInbox(); }, 5000);
