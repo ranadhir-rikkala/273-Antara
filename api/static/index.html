@@ -36,6 +36,9 @@
   button:disabled { opacity: .5; cursor: default; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .grow { flex: 1; min-width: 0; }
+  .samples { display: grid; gap: 8px; margin-top: 12px; }
+  .sample { font-size: 13px; padding: 6px 10px; text-align: left; }
+  .sample .aud { display: block; font-size: 11px; color: var(--muted); }
   .chat { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
   .msg { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }
   .msg.user { align-self: flex-end; background: var(--chip); max-width: 80%; }
@@ -78,11 +81,34 @@
   <div>
     <section>
       <h2>Ask the helpdesk</h2>
-      <div id="chat" class="chat"><div class="empty">Ask a policy question, request access, or report a problem.</div></div>
+      <div id="chat" class="chat"><div class="empty">Ask about sensitive internal information. Each person sees only what their groups allow, and nothing leaves the network.</div></div>
       <form id="ask" class="row">
-        <input id="question" type="text" class="grow" placeholder="e.g. How do contractors get VPN access?" autocomplete="off">
+        <input id="question" type="text" class="grow" placeholder="e.g. What is the API rate limit for the Pro tier?" autocomplete="off">
         <button type="submit">Send</button>
       </form>
+      <div class="samples">
+        <label>Sensitive information: switch the person above and ask again to compare</label>
+        <div class="row">
+          <button type="button" class="secondary sample" data-q="What is the API rate limit for the Pro tier?">API rate limits <span class="aud">employees</span></button>
+          <button type="button" class="secondary sample" data-q="What fraud risk score blocks a transaction?">Fraud thresholds <span class="aud">employees</span></button>
+          <button type="button" class="secondary sample" data-q="What is the salary band for L4 engineers?">Salary bands <span class="aud">employees, managers</span></button>
+          <button type="button" class="secondary sample" data-q="Which open vulnerability is critical and how fast must it be patched?">Embargoed vulnerabilities <span class="aud">security leads</span></button>
+          <button type="button" class="secondary sample" data-q="What is the payments webhook signing key?">Signing key <span class="aud">security leads, always redacted</span></button>
+          <button type="button" class="secondary sample" data-q="Can I paste our source code into a public AI chatbot?">Source code and public AI <span class="aud">everyone</span></button>
+        </div>
+        <div class="row">
+          <label for="helpdesk-samples">Helpdesk examples</label>
+          <select id="helpdesk-samples" style="width:auto">
+            <option value="">Choose a question…</option>
+            <option>How do contractors get VPN access?</option>
+            <option>How often do standard account passwords have to be rotated?</option>
+            <option>Can I deploy to production on a Friday?</option>
+            <option>I need read access to the production database for the billing migration</option>
+            <option>Please create a ticket: my laptop screen does not lock after 5 minutes</option>
+            <option>The VPN is down for me since this morning</option>
+          </select>
+        </div>
+      </div>
       <div id="ask-error" class="error"></div>
     </section>
   </div>
@@ -362,6 +388,15 @@ async function loadInbox() {
   }
 }
 
+function askSample(question) {
+  $("question").value = question;
+  $("ask").requestSubmit();
+}
+for (const button of document.querySelectorAll(".sample")) button.addEventListener("click", () => askSample(button.dataset.q));
+$("helpdesk-samples").addEventListener("change", (event) => {
+  if (event.target.value) askSample(event.target.value);
+  event.target.value = "";
+});
 $("who").addEventListener("change", () => { conversation.length = 0; loadDocs(); loadInbox(); });
 startAuth().then(() => {
   if (auth.mode === "oidc" && !auth.token) return;
