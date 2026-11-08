@@ -30,7 +30,7 @@ async def upload(client: httpx.AsyncClient, index: int, codes: Counter, latencie
     response = await client.post(
         "/documents",
         files={"file": (f"policy-{index}.txt", synthetic_policy(index), "text/plain")},
-        data={"groups": "employees,contractors"},
+        data={"groups": client.headers.get("X-User-Groups", "employees")},
     )
     latencies.append(time.perf_counter() - started)
     codes[f"upload {response.status_code}"] += 1

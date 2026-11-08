@@ -77,7 +77,7 @@ def run_case(client: httpx.Client, case: dict[str, Any], timeout: float) -> tupl
         return {"http": response.status_code, "status": None}, time.perf_counter() - started
     run_id = response.json()["run_id"]
     while True:
-        state = client.get(f"/agent/runs/{run_id}").json()
+        state = client.get(f"/agent/runs/{run_id}", headers=headers).json()
         if state["status"] in SETTLED or time.perf_counter() - started > timeout:
             return state, time.perf_counter() - started
         time.sleep(1.5)
@@ -92,7 +92,7 @@ def upload_fixtures(client: httpx.Client, timeout: float = 180) -> list[str]:
         ids.append(response.raise_for_status().json()["document_id"])
     started = time.perf_counter()
     while time.perf_counter() - started < timeout:
-        statuses = [client.get(f"/documents/{doc}").json()["versions"][0]["status"] for doc in ids]
+        statuses = [client.get(f"/documents/{doc}", headers=headers).json()["versions"][0]["status"] for doc in ids]
         if all(status == "READY" for status in statuses):
             return ids
         time.sleep(2)
@@ -101,7 +101,7 @@ def upload_fixtures(client: httpx.Client, timeout: float = 180) -> list[str]:
 
 def remove_fixtures(client: httpx.Client, ids: list[str]) -> None:
     for doc in ids:
-        client.delete(f"/documents/{doc}")
+        client.delete(f"/documents/{doc}", headers={"X-User-Id": "eval-fixtures", "X-User-Groups": FIXTURE_GROUPS})
 
 
 def deny_leftover_approvals(client: httpx.Client) -> None:
@@ -130,9 +130,10 @@ def main() -> None:
             state, seconds = run_case(client, case, args.timeout)
             for citation in state.get("citations", []):
                 if citation["document_id"] not in titles:
-                    titles[citation["document_id"]] = client.get(f"/documents/{citation['document_id']}").json()[
-                        "title"
-                    ]
+                    reader = {"X-User-Id": case["user"], "X-User-Groups": case["groups"]}
+                    titles[citation["document_id"]] = client.get(
+                        f"/documents/{citation['document_id']}", headers=reader
+                    ).json()["title"]
             outcome = Outcome(case["id"], check(case, state, titles), seconds)
             outcomes.append(outcome)
             mark = "PASS" if outcome.passed else "FAIL"

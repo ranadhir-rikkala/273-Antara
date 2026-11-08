@@ -221,6 +221,7 @@ class AgentRunState:
     cached: bool = False
     needs_input: bool = False
     flags: list[str] = field(default_factory=list)
+    requester_id: str = ""
 
 
 @dataclass

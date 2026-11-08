@@ -62,3 +62,147 @@ def test_questions_are_trimmed_and_must_be_reasonable_length() -> None:
     for bad in ("", "   ", "x" * (services.MAX_QUESTION_LENGTH + 1)):
         with pytest.raises(services.InvalidQuestionError):
             services.clean_question(bad)
+
+
+BOB = UserContext("bob", ["contractors"])
+ERIN = UserContext("erin", ["operators"])
+SECRET_DOC = {
+    "document_id": "d1",
+    "title": "runbook.md",
+    "owner_id": "dave",
+    "groups": ["security-leads"],
+    "deleted": False,
+}
+HANDBOOK = {"document_id": "d2", "title": "handbook.md", "owner_id": "alice", "groups": ["employees"], "deleted": False}
+
+
+async def test_users_share_documents_only_with_their_own_groups_unless_they_publish_policy() -> None:
+    objects, catalog = FakeObjectStore(), FakeCatalog()
+    with pytest.raises(services.ForbiddenError, match="only share with your own groups"):
+        await services.register_upload(BOB, "x.md", "text/plain", b"x", ["security-leads"], objects, catalog)
+    with pytest.raises(services.ForbiddenError):
+        await services.register_upload(
+            ALICE, "x.md", "text/plain", b"x", ["employees", "contractors"], objects, catalog
+        )
+    with pytest.raises(services.ForbiddenError, match="at least one group"):
+        await services.register_upload(ALICE, "x.md", "text/plain", b"x", [], objects, catalog)
+    await services.register_upload(DAVE, "p.md", "text/plain", b"p", ["employees", "contractors"], objects, catalog)
+    await services.register_upload(ERIN, "p.md", "text/plain", b"p", ["employees"], objects, catalog)
+    assert [upload["owner_id"] for upload in catalog.uploads] == ["dave", "erin"]
+
+
+async def test_oversized_uploads_are_refused_before_anything_is_stored() -> None:
+    objects, catalog = FakeObjectStore(), FakeCatalog()
+    with pytest.raises(services.TooLargeError, match="5 MB"):
+        await services.register_upload(
+            ALICE, "big.txt", "text/plain", b"a" * (services.MAX_UPLOAD_BYTES + 1), ["employees"], objects, catalog
+        )
+    assert objects.objects == {} and catalog.uploads == []
+
+
+async def test_document_details_are_hidden_from_anyone_whose_groups_cannot_read_it() -> None:
+    catalog = FakeCatalog({"d1": SECRET_DOC})
+    assert (await services.readable_document("d1", DAVE, catalog))["title"] == "runbook.md"
+    for user in (ALICE, BOB):
+        with pytest.raises(services.NotFoundError):
+            await services.readable_document("d1", user, catalog)
+    with pytest.raises(services.NotFoundError):
+        await services.readable_document("missing", DAVE, catalog)
+
+
+async def test_only_the_owner_operators_or_security_leads_may_delete_a_document() -> None:
+    catalog = FakeCatalog({"d1": SECRET_DOC, "d2": HANDBOOK})
+    await services.authorize_delete("d2", ALICE, catalog)
+    await services.authorize_delete("d2", DAVE, catalog)
+    await services.authorize_delete("d1", ERIN, catalog)
+    with pytest.raises(services.ForbiddenError):
+        await services.authorize_delete("d2", CAROL, catalog)
+    with pytest.raises(services.NotFoundError):
+        await services.authorize_delete("d1", BOB, catalog)
+    with pytest.raises(services.NotFoundError):
+        await services.authorize_delete("missing", ERIN, catalog)
+
+
+def test_a_run_is_readable_only_by_the_person_who_asked() -> None:
+    from common.models import AgentRunState
+
+    mine = AgentRunState(status="COMPLETED", requester_id="alice")
+    assert services.may_read_run(ALICE, mine) is True
+    assert services.may_read_run(BOB, mine) is False
+    assert services.may_read_run(ALICE, AgentRunState(status="COMPLETED")) is False
+
+
+def test_a_trace_summary_lists_services_and_called_hosts_and_flags_any_outside_the_cluster() -> None:
+    trace = {
+        "processes": {"p1": {"serviceName": "api"}, "p2": {"serviceName": "agent"}, "p3": {"serviceName": "gateway"}},
+        "spans": [
+            {
+                "processID": "p2",
+                "startTime": 20,
+                "tags": [
+                    {"key": "span.kind", "value": "client"},
+                    {"key": "http.url", "value": "http://gateway:8080/v1/chat"},
+                ],
+            },
+            {
+                "processID": "p1",
+                "startTime": 10,
+                "tags": [
+                    {"key": "span.kind", "value": "server"},
+                    {"key": "http.url", "value": "http://localhost:8000/agent/runs"},
+                ],
+            },
+            {
+                "processID": "p3",
+                "startTime": 30,
+                "tags": [
+                    {"key": "span.kind", "value": "client"},
+                    {"key": "http.url", "value": "http://ollama:11434/v1/chat"},
+                ],
+            },
+            {
+                "processID": "p3",
+                "startTime": 40,
+                "tags": [
+                    {"key": "span.kind", "value": "client"},
+                    {"key": "http.url", "value": "https://api.openai.com/v1/chat"},
+                ],
+            },
+            {
+                "processID": "p3",
+                "startTime": 50,
+                "tags": [
+                    {"key": "span.kind", "value": "client"},
+                    {"key": "http.url", "value": "http://10.42.0.9:9000/x"},
+                ],
+            },
+        ],
+    }
+    assert services.summarize_trace(trace) == {
+        "services": ["api", "agent", "gateway"],
+        "hosts": ["gateway", "ollama", "api.openai.com", "10.42.0.9"],
+        "outside": ["api.openai.com"],
+        "spans": 5,
+    }
+
+
+class Traces:
+    def __init__(self, traces: dict[str, dict]) -> None:
+        self.traces = traces
+        self.asked: list[str] = []
+
+    async def get(self, trace_id: str) -> dict | None:
+        self.asked.append(trace_id)
+        return self.traces.get(trace_id)
+
+
+async def test_trace_summaries_accept_only_real_trace_ids_and_report_missing_traces() -> None:
+    trace_id = "0" * 31 + "a"
+    traces = Traces({trace_id: {"processes": {"p": {"serviceName": "api"}}, "spans": []}})
+    assert (await services.trace_summary(trace_id, traces))["services"] == []
+    for bad in ("../../api/services", "A" * 32, "abc"):
+        with pytest.raises(services.NotFoundError):
+            await services.trace_summary(bad, traces)
+    with pytest.raises(services.NotFoundError):
+        await services.trace_summary("f" * 32, traces)
+    assert traces.asked == [trace_id, "f" * 32]

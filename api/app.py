@@ -19,6 +19,7 @@ from api.metrics import PrometheusAdmissionMetrics
 from api.ops.router import router as ops_router
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
 from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
+from api.traces import JaegerTraces
 from common import storage
 from common.config import settings
 from common.db import pool
@@ -101,6 +102,10 @@ async def inbox() -> PostgresApprovalInbox:
     return PostgresApprovalInbox(await pool())
 
 
+def objects() -> S3ObjectStore:
+    return S3ObjectStore()
+
+
 async def admission() -> AsyncIterator[None]:
     async for _ in inflight.hold():
         yield
@@ -142,16 +147,22 @@ async def upload_document(
     user: UserContext = Depends(current_user),
     client: Client = Depends(temporal),
     documents: PostgresDocumentCatalog = Depends(catalog),
+    store: S3ObjectStore = Depends(objects),
 ) -> dict[str, str]:
-    request = await services.register_upload(
-        user,
-        file.filename,
-        file.content_type,
-        await file.read(),
-        services.parse_groups(groups),
-        S3ObjectStore(),
-        documents,
-    )
+    try:
+        request = await services.register_upload(
+            user,
+            file.filename,
+            file.content_type,
+            await file.read(),
+            services.parse_groups(groups),
+            store,
+            documents,
+        )
+    except services.TooLargeError as error:
+        raise HTTPException(status_code=413, detail=str(error)) from error
+    except services.ForbiddenError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
     workflow_id = ingest_workflow_id(request.version_id)
     await client.start_workflow(Workflows.INGEST, request, id=workflow_id, task_queue=INGEST_CPU)
     return {"document_id": request.document_id, "version_id": request.version_id, "workflow_id": workflow_id}
@@ -165,15 +176,28 @@ async def list_documents(
 
 
 @app.get("/documents/{document_id}")
-async def get_document(document_id: str, documents: PostgresDocumentCatalog = Depends(catalog)) -> dict[str, object]:
-    document = await documents.get(document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+async def get_document(
+    document_id: str, user: UserContext = Depends(current_user), documents: PostgresDocumentCatalog = Depends(catalog)
+) -> dict[str, object]:
+    try:
+        return await services.readable_document(document_id, user, documents)
+    except services.NotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.delete("/documents/{document_id}", status_code=202)
-async def delete_document(document_id: str, client: Client = Depends(temporal)) -> dict[str, str]:
+async def delete_document(
+    document_id: str,
+    user: UserContext = Depends(current_user),
+    documents: PostgresDocumentCatalog = Depends(catalog),
+    client: Client = Depends(temporal),
+) -> dict[str, str]:
+    try:
+        await services.authorize_delete(document_id, user, documents)
+    except services.NotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except services.ForbiddenError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
     workflow_id = f"delete-{document_id}"
     await client.start_workflow(Workflows.DELETE_DOCUMENT, document_id, id=workflow_id, task_queue=INGEST_CPU)
     return {"document_id": document_id, "workflow_id": workflow_id}
@@ -203,14 +227,26 @@ async def start_run(
 
 
 @app.get("/agent/runs/{run_id}")
-async def get_run(run_id: str, client: Client = Depends(temporal)) -> dict[str, object]:
+async def get_run(
+    run_id: str, user: UserContext = Depends(current_user), client: Client = Depends(temporal)
+) -> dict[str, object]:
     try:
         state = await read_run_state(client.get_workflow_handle(run_id))
     except RunNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except RunUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error), headers={"Retry-After": "5"}) from error
+    if not services.may_read_run(user, state):
+        raise HTTPException(status_code=404, detail="Run not found")
     return {"run_id": run_id, **asdict(state)}
+
+
+@app.get("/traces/{trace_id}")
+async def trace_summary(trace_id: str, user: UserContext = Depends(current_user)) -> dict[str, object]:
+    try:
+        return await services.trace_summary(trace_id, JaegerTraces(settings.jaeger_query_url))
+    except services.NotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/approvals")

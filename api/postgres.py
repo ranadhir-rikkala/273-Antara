@@ -80,8 +80,9 @@ class PostgresDocumentCatalog:
         async with self._pool.connection() as conn:
             document = await (
                 await conn.execute(
-                    "SELECT title, active_version_id::text, deleted_at IS NOT NULL FROM documents "
-                    "WHERE document_id::text = %s",
+                    "SELECT title, active_version_id::text, deleted_at IS NOT NULL, owner_id, "
+                    "ARRAY(SELECT group_name FROM document_acl a WHERE a.document_id = d.document_id) "
+                    "FROM documents d WHERE document_id::text = %s",
                     (document_id,),
                 )
             ).fetchone()
@@ -99,6 +100,8 @@ class PostgresDocumentCatalog:
             "title": document[0],
             "active_version_id": document[1],
             "deleted": document[2],
+            "owner_id": document[3],
+            "groups": list(document[4]),
             "versions": [{"version_id": v[0], "version_number": v[1], "status": v[2], "error": v[3]} for v in versions],
         }
 

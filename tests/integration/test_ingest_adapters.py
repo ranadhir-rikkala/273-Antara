@@ -73,6 +73,15 @@ async def test_catalog_lists_by_group_and_reports_missing_documents(db) -> None:
     assert await PostgresDocumentCatalog(db).get("missing") is None
 
 
+async def test_catalog_details_carry_the_owner_and_who_may_read(db) -> None:
+    await PostgresDocumentCatalog(db).create_upload(
+        *PUBLIC, "alice", "a.md", "originals/a", "text/plain", ["employees", "managers"]
+    )
+    document = await PostgresDocumentCatalog(db).get(PUBLIC[0])
+    assert document["owner_id"] == "alice"
+    assert sorted(document["groups"]) == ["employees", "managers"]
+
+
 async def test_version_status_and_reconciler_scan(db) -> None:
     await PostgresDocumentCatalog(db).create_upload(
         *PUBLIC, "alice", "a.md", "originals/a", "text/plain", ["employees"]

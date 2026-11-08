@@ -60,4 +60,5 @@ spec:
           env:
             - {name: TEMPORAL_ADDRESS, value: temporal-frontend:7233}
             - {name: TEMPORAL_UI_PUBLIC_PATH, value: /temporal}
+            - {name: TEMPORAL_DISABLE_WRITE_ACTIONS, value: "true"}
           ports: [{containerPort: 8080}]

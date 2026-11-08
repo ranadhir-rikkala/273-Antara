@@ -249,6 +249,7 @@
     <div class="block">
       <h3><span>Documents you can read</span><span class="label" id="doc-count"></span></h3>
       <div id="docs"></div>
+      <div id="docs-error" class="error"></div>
     </div>
     <div class="block">
       <details class="upload">
@@ -257,7 +258,7 @@
           <input id="file" type="file" accept=".pdf,.txt,.md" required>
           <div>
             <label class="label" for="acl">Who can read it</label>
-            <input id="acl" type="text" value="employees,contractors">
+            <input id="acl" type="text" value="employees">
           </div>
           <div><button class="btn" type="submit">Upload</button></div>
         </form>
@@ -497,28 +498,13 @@ function check(label, [tone, text]) {
   return el("div", { class: `check ${tone}` }, el("span", { class: "label" }, label), el("span", { class: "text" }, el("i", {}, mark), text));
 }
 
-function insideCluster(host) {
-  return !host.includes(".") || host.endsWith(".svc") || host.endsWith(".svc.cluster.local") || host === "localhost"
-    || /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
-}
-
 async function networkCheck(traceId) {
   for (let attempt = 0; attempt < 8; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 2500));
     try {
-      const response = await fetch(`/jaeger/api/traces/${traceId}`);
-      if (!response.ok) continue;
-      const trace = (await response.json()).data?.[0];
-      if (!trace) continue;
-      const hosts = new Set();
-      for (const span of trace.spans) {
-        const tags = Object.fromEntries(span.tags.map((tag) => [tag.key, tag.value]));
-        if (tags["span.kind"] === "client" && tags["http.url"]) hosts.add(new URL(tags["http.url"]).host);
-      }
-      const outside = [...hosts].filter((host) => !insideCluster(host.split(":")[0]));
-      if (outside.length) return [["leak", `Left the cluster: ${outside.join(", ")}`], trace.spans.length];
-      const called = [...hosts].map((host) => host.split(":")[0]);
-      return [["ok", called.length ? `Only called ${called.join(", ")}` : "No outbound calls"], trace.spans.length];
+      const summary = await api(`/traces/${traceId}`);
+      if (summary.outside.length) return [["leak", `Left the cluster: ${summary.outside.join(", ")}`], summary.spans];
+      return [["ok", summary.hosts.length ? `Only called ${summary.hosts.join(", ")}` : "No outbound calls"], summary.spans];
     } catch (_) {}
   }
   return [["na", "Trace not available"], 0];
@@ -608,7 +594,11 @@ async function loadDocs() {
     const list = el("ul", { class: "doclist" });
     for (const doc of docs) {
       const remove = el("button", { class: "remove", title: `Delete ${doc.title}`, "aria-label": `Delete ${doc.title}` }, icon(ICONS.trash, 14));
-      remove.addEventListener("click", async () => { await api(`/documents/${doc.document_id}`, { method: "DELETE" }); loadDocs(); });
+      remove.addEventListener("click", async () => {
+        $("docs-error").textContent = "";
+        try { await api(`/documents/${doc.document_id}`, { method: "DELETE" }); } catch (error) { $("docs-error").textContent = error.message; }
+        loadDocs();
+      });
       const kind = { READY: "good", FAILED: "bad" }[doc.status] || "warn";
       const side = el("span", { class: "side" });
       if (doc.status !== "READY") side.append(el("span", { class: `chip ${kind}` }, doc.status.toLowerCase()));
@@ -671,6 +661,7 @@ async function loadInbox() {
 
 function markClearance() {
   const mine = identity().groups.split(",");
+  $("acl").value = mine.join(",");
   for (const button of document.querySelectorAll(".sample")) {
     const allowed = button.dataset.groups.split(",").some((group) => mine.includes(group));
     button.classList.toggle("locked", !allowed);

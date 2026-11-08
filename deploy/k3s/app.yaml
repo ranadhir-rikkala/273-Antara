@@ -212,6 +212,32 @@ spec:
   rules:
     - http:
         paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: api, port: {number: 8000}}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: tools-auth
+  namespace: antara
+spec:
+  basicAuth:
+    secret: ops-tools-auth
+    realm: Antara operators
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: antara-tools
+  namespace: antara
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: antara-tools-auth@kubernetescrd
+spec:
+  rules:
+    - http:
+        paths:
           - path: /grafana
             pathType: Prefix
             backend:
@@ -224,10 +250,6 @@ spec:
             pathType: Prefix
             backend:
               service: {name: temporal-ui, port: {number: 8080}}
-          - path: /
-            pathType: Prefix
-            backend:
-              service: {name: api, port: {number: 8000}}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -244,7 +266,7 @@ metadata:
   name: antara-prometheus
   namespace: antara
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: antara-strip-prometheus@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: antara-tools-auth@kubernetescrd,antara-strip-prometheus@kubernetescrd
 spec:
   rules:
     - http:

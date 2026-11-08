@@ -60,6 +60,7 @@ class AgentRunWorkflow:
 
     @workflow.run
     async def run(self, request: AgentRunRequest) -> AgentRunState:
+        self._state.requester_id = request.user.user_id
         try:
             return await self._handle(request)
         except (ActivityError, ChildWorkflowError) as error:

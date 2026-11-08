@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     gateway_url: str = "http://gateway:8080"
     prometheus_url: str = "http://prometheus:9090"
+    jaeger_query_url: str = "http://jaeger:16686/jaeger"
     k8s_namespace: str = "antara"
     chaos_enabled: bool = False
     ops_target_url: str = "http://api:8000"

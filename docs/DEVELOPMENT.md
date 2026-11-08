@@ -72,6 +72,8 @@ kubectl -n antara exec deploy/ollama -- ollama pull nomic-embed-text
 scripts/local-deploy.sh
 ```
 
+Grafana, Jaeger, Prometheus and the Temporal UI are at `/grafana`, `/jaeger`, `/prometheus` and `/temporal` behind an operator password (user `operator`; `scripts/local-deploy.sh` creates the password once in `deploy/local/.kube/ops-tools-password`, which git ignores). The Temporal UI is read-only.
+
 Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only between pods in the namespace, to cluster DNS, and to the Kubernetes API on private addresses. Downloading the models is the one step that needs the internet, so it lifts the policy for the download and `scripts/local-deploy.sh` puts it back. Models stay on the Ollama volume afterwards.
 
 The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
@@ -133,6 +135,10 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 | Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers | 6 |
 | Manoj | CI on GitHub Actions: `scripts/check.sh` on every push | 2 |
 | Manoj | `docs/DEMO.md` presenter script | — |
+| Manoj | Resource requests and limits on every app pod, and run the image as a non-root user | 2, 6 |
+| Manoj | Prometheus alert rules: pods not ready, queue backlog growing, 429 rate, model down | 6 |
+| Manoj | Backup and restore drill for the app database, measured against the 15-minute RPO | 8 |
+| Vinayak | Per-user rate limit, so one user cannot use up the shared admission budget | 4 |
 
 Already built from the course, for the report: graceful worker shutdown with activity heartbeats (module 6), and self-revoking access as a lease whose durable timer runs the compensating revoke (modules 7 and 9).
 

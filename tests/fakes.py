@@ -366,8 +366,9 @@ class FakeWorkflowInspector:
 
 
 class FakeCatalog:
-    def __init__(self) -> None:
+    def __init__(self, documents: dict[str, dict[str, Any]] | None = None) -> None:
         self.uploads: list[dict[str, Any]] = []
+        self.documents = documents or {}
 
     async def create_upload(
         self,
@@ -385,7 +386,7 @@ class FakeCatalog:
         return []
 
     async def get(self, document_id: str) -> dict[str, Any] | None:
-        return None
+        return self.documents.get(document_id)
 
     async def count_in_flight(self) -> int:
         return len(self.uploads)
