@@ -59,3 +59,20 @@ def test_affected_system_is_named_consistently() -> None:
     assert affected_system("Outlook keeps crashing") == "email"
     assert affected_system("wi-fi keeps dropping") == "wifi"
     assert affected_system("something is weird") is None
+
+
+def test_questions_about_security_topics_stay_questions_but_reports_are_incidents() -> None:
+    for question in (
+        "How do I report a phishing email?",
+        "What should I do about a suspicious email?",
+        "Does antivirus catch ransomware?",
+        "how do I know if I've been hacked?",
+    ):
+        assert classify_by_rules(question) == Intent.QUESTION, question
+    for report in (
+        "I clicked a phishing link",
+        "I think my account was hacked",
+        "There is ransomware on the file server",
+        "Got a suspicious email asking for my login",
+    ):
+        assert classify_by_rules(report) == Intent.INCIDENT, report

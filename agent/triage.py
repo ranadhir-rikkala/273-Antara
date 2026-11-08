@@ -79,7 +79,7 @@ def classify_by_rules(text: str) -> Intent:
     lowered = f" {text.lower()} "
     if any(phrase in lowered for phrase in ACTION_PHRASES) or BROKEN_DEVICE.search(lowered):
         return Intent.ACTION
-    if SECURITY_THREAT.search(lowered):
+    if SECURITY_THREAT.search(lowered) and not QUESTION_START.match(lowered):
         return Intent.INCIDENT
     if OUTAGE.search(lowered) and not QUESTION_START.match(lowered):
         return Intent.INCIDENT

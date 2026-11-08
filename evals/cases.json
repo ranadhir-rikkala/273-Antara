@@ -397,5 +397,20 @@
       ],
       "no_tools": true
     }
+  },
+  {
+    "id": "security-question-is-not-an-incident",
+    "question": "How do I report a phishing email?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "answer_contains_any": [
+        "Report Phishing",
+        "report phishing"
+      ],
+      "no_tools": true
+    }
   }
 ]
