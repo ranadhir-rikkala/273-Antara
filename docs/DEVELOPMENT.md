@@ -135,7 +135,7 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 | Vinayak | Demo UI: helpdesk and ops console side by side, with guided steps | — |
 | Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers | 6 |
 | Manoj | CI on GitHub Actions: `scripts/check.sh` on every push | 2 |
-| Manoj | `docs/DEMO.md` presenter script | — |
+| Manoj | Rehearse the demo twice with `docs/DEMO.md`, time each act, fix the script where reality differs, and record a backup video | — |
 | Manoj | Resource requests and limits on every app pod, and run the image as a non-root user | 2, 6 |
 | Manoj | Prometheus alert rules: pods not ready, queue backlog growing, 429 rate, model down | 6 |
 | Manoj | Backup and restore drill for the app database, measured against the 15-minute RPO | 8 |

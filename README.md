@@ -52,3 +52,11 @@ docker compose -f deploy/compose/docker-compose.yml up -d --build
 ```
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup, the smoke test, tests and who owns which folder.
+
+| Document | What it covers |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The diagram and how a question, an access request and a document flow |
+| [docs/RESULTS.md](docs/RESULTS.md) | Every number measured live: recovery, scaling, backpressure, sovereignty, latency |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Why Temporal, pgvector, small local models and sagas, and the known single points of failure |
+| [docs/SECURITY.md](docs/SECURITY.md) | How Antara covers each of the OWASP Top 10 risks for LLM applications |
+| [docs/DEMO.md](docs/DEMO.md) | The timed demo script, fallbacks and expected questions |
