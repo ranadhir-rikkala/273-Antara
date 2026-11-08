@@ -10,3 +10,4 @@ deploy/aws/.state
 deploy/local/.kube/
 .idea/
 evals/results/
+CLAUDE.md
