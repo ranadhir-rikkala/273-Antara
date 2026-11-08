@@ -16,6 +16,7 @@ LOGIC = [
     "agent/triage.py",
     "api/ports.py",
     "api/services.py",
+    "api/admission.py",
     "api/ops/ports.py",
     "api/ops/services.py",
     "ingest/ports.py",

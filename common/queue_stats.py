@@ -2,6 +2,7 @@ from temporalio.api.enums.v1 import TaskQueueType
 from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeTaskQueueRequest
 from temporalio.client import Client
+from temporalio.service import RPCError
 
 from common.models import QueueStats
 
@@ -26,3 +27,14 @@ class TemporalQueueInspector:
 
     async def stats(self, queue: str) -> QueueStats:
         return await queue_stats(self._client, queue)
+
+
+class TemporalBacklogReader:
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    async def backlog(self, queue: str) -> int | None:
+        try:
+            return (await queue_stats(self._client, queue)).backlog
+        except RPCError:
+            return None

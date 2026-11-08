@@ -35,3 +35,13 @@ class ApprovalInbox(Protocol):
 
 class ObjectStore(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> None: ...
+
+
+class BacklogReader(Protocol):
+    async def backlog(self, queue: str) -> int | None: ...
+
+
+class AdmissionMetrics(Protocol):
+    def rejected(self, reason: str) -> None: ...
+
+    def backlog(self, queue: str, value: int) -> None: ...

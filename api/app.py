@@ -4,16 +4,17 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 from temporalio.client import Client
 
 from api import services
-from api.admission import BacklogGate, InflightLimit, LoadGate
+from api.admission import BacklogGate, InflightLimit, LoadGate, Overloaded
 from api.auth import current_user
+from api.metrics import PrometheusAdmissionMetrics
 from api.ops.router import router as ops_router
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
 from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
@@ -22,6 +23,7 @@ from common.config import settings
 from common.db import pool
 from common.models import AgentRunRequest, ApprovalDecision, ConversationTurn, UserContext
 from common.names import Signals, Workflows
+from common.queue_stats import TemporalBacklogReader
 from common.queues import AGENT, INGEST_CPU
 from common.storage import S3ObjectStore
 from common.temporal_client import connect
@@ -35,16 +37,19 @@ class AppState:
 
 
 app_state = AppState()
-inflight = InflightLimit(settings.max_inflight_requests)
-ingest_gate = BacklogGate(INGEST_CPU, settings.max_ingest_backlog)
-agent_gate = BacklogGate(AGENT, settings.max_agent_backlog)
+admission_metrics = PrometheusAdmissionMetrics()
+inflight = InflightLimit(settings.max_inflight_requests, admission_metrics)
+ingest_gate = BacklogGate(INGEST_CPU, settings.max_ingest_backlog, admission_metrics)
+agent_gate = BacklogGate(AGENT, settings.max_agent_backlog, admission_metrics)
 
 
 async def _documents_in_flight() -> int:
     return await PostgresDocumentCatalog(await pool()).count_in_flight()
 
 
-documents_gate = LoadGate("documents-in-flight", settings.max_documents_in_flight, _documents_in_flight)
+documents_gate = LoadGate(
+    "documents-in-flight", settings.max_documents_in_flight, _documents_in_flight, admission_metrics
+)
 
 
 @asynccontextmanager
@@ -59,6 +64,11 @@ app = FastAPI(title="Antara API", lifespan=lifespan)
 app.mount("/metrics", make_asgi_app())
 app.include_router(ops_router)
 FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,metrics")
+
+
+@app.exception_handler(Overloaded)
+async def overloaded(_: Request, error: Overloaded) -> JSONResponse:
+    return JSONResponse({"detail": error.detail}, status_code=429, headers={"Retry-After": str(error.retry_after)})
 
 
 class HistoryTurn(BaseModel):
@@ -96,12 +106,12 @@ async def admission() -> AsyncIterator[None]:
 
 
 async def admit_ingest(client: Client = Depends(temporal)) -> None:
-    await ingest_gate.admit(client)
+    await ingest_gate.admit(TemporalBacklogReader(client))
     await documents_gate.admit()
 
 
 async def admit_agent(client: Client = Depends(temporal)) -> None:
-    await agent_gate.admit(client)
+    await agent_gate.admit(TemporalBacklogReader(client))
 
 
 @app.get("/", include_in_schema=False)
