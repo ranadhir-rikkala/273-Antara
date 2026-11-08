@@ -66,9 +66,13 @@ docker compose -f deploy/local/docker-compose.yml up -d
 export KUBECONFIG=$PWD/deploy/local/.kube/kubeconfig.yaml
 kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.17.2/keda-2.17.2.yaml
 scripts/local-deploy.sh
+kubectl -n antara delete networkpolicy default-deny
 kubectl -n antara exec deploy/ollama -- ollama pull qwen2.5:1.5b
 kubectl -n antara exec deploy/ollama -- ollama pull nomic-embed-text
+scripts/local-deploy.sh
 ```
+
+Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only between pods in the namespace, to cluster DNS, and to the Kubernetes API on private addresses. Downloading the models is the one step that needs the internet, so it lifts the policy for the download and `scripts/local-deploy.sh` puts it back. Models stay on the Ollama volume afterwards.
 
 The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
 

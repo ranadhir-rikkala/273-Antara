@@ -89,6 +89,12 @@
   .composer button { border: 0; background: var(--ink); color: var(--paper); padding: 0 20px; cursor: pointer; font-weight: 600; }
   .composer button:hover { background: var(--vault); color: var(--vault-ink); }
   .error { color: var(--brick); font-size: 13px; min-height: 20px; margin-top: 6px; }
+  .provenance { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--vault);
+                border: 1px solid var(--vault-tint); background: var(--vault-tint); border-radius: 4px; padding: 6px 10px; }
+  .provenance.pending { color: var(--muted); background: transparent; border-style: dashed; border-color: var(--line); }
+  .provenance.leak { color: var(--brick); background: var(--brick-tint); border-color: transparent; }
+  .provenance code { font: 11.5px/1.4 var(--mono); }
+  .provenance a { margin-left: auto; font-size: 12px; }
 
   .clearance { margin-top: 22px; }
   .clearance-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -442,6 +448,52 @@ function renderBot(node, state) {
   body.append(sources);
 }
 
+function insideCluster(host) {
+  return !host.includes(".") || host.endsWith(".svc") || host.endsWith(".svc.cluster.local") || host === "localhost"
+    || /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+}
+
+async function showProvenance(node, traceId) {
+  const line = el("div", { class: "provenance pending" }, "Checking where this answer's network calls went…");
+  node.body.append(line);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    try {
+      const response = await fetch(`/jaeger/api/traces/${traceId}`);
+      if (!response.ok) continue;
+      const trace = (await response.json()).data?.[0];
+      if (!trace) continue;
+      const firstSeen = new Map();
+      for (const span of [...trace.spans].sort((a, b) => a.startTime - b.startTime)) {
+        const name = trace.processes[span.processID].serviceName;
+        if (!firstSeen.has(name)) firstSeen.set(name, span.startTime);
+      }
+      const services = [...firstSeen.keys()];
+      const hosts = new Set();
+      for (const span of trace.spans) {
+        const tags = Object.fromEntries(span.tags.map((tag) => [tag.key, tag.value]));
+        if (tags["span.kind"] !== "client" || !tags["http.url"]) continue;
+        hosts.add(new URL(tags["http.url"]).host);
+      }
+      const outside = [...hosts].filter((host) => !insideCluster(host.split(":")[0]));
+      const link = el("a", { href: `/jaeger/trace/${traceId}`, target: "_blank", rel: "noopener" }, `View trace · ${trace.spans.length} spans ↗`);
+      if (outside.length) {
+        line.className = "provenance leak";
+        line.replaceChildren(`Calls left the cluster: ${outside.join(", ")}`, link);
+      } else {
+        line.className = "provenance";
+        line.replaceChildren(
+          `✓ Answered inside the network · ${services.join(" → ")}`,
+          ...(hosts.size ? [" · calls to ", el("code", {}, [...hosts].join(", "))] : []),
+          " · 0 left the cluster",
+          link);
+      }
+      return;
+    } catch (_) {}
+  }
+  line.replaceChildren("Trace not available yet.");
+}
+
 async function poll(runId, node) {
   for (let attempt = 0; attempt < 600; attempt++) {
     try {
@@ -466,13 +518,14 @@ $("ask").addEventListener("submit", async (event) => {
   chat.scrollTop = chat.scrollHeight;
   $("question").value = "";
   try {
-    const { run_id } = await api("/agent/runs", {
+    const { run_id, trace_id } = await api("/agent/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ question, history: conversation.slice(-3) }),
     });
     const final = await poll(run_id, bot);
     if (final && final.answer) conversation.push({ question, answer: final.answer });
+    if (final && trace_id) showProvenance(bot, trace_id);
   } catch (error) {
     bot.remove();
     $("ask-error").textContent = error.message;

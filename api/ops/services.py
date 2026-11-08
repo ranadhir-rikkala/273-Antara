@@ -2,7 +2,16 @@ import asyncio
 from collections.abc import Awaitable
 from typing import Any
 
-from api.ops.ports import Cluster, MetricsReader, ModelControl, OpsStore, QueueReader, ReconcilerTrigger, WorkflowReader
+from api.ops.ports import (
+    Cluster,
+    EgressProbe,
+    MetricsReader,
+    ModelControl,
+    OpsStore,
+    QueueReader,
+    ReconcilerTrigger,
+    WorkflowReader,
+)
 from common.models import UserContext
 from common.queues import AGENT, INGEST_CPU, INGEST_GPU, RECONCILER, TOOLS
 
@@ -144,3 +153,26 @@ def validate_flood(docs: int, questions: int) -> tuple[int, int]:
     if not (0 <= docs <= MAX_FLOOD_DOCS and 0 <= questions <= MAX_FLOOD_QUESTIONS) or docs + questions == 0:
         raise ChaosError(f"Flood with 1-{MAX_FLOOD_DOCS} documents and 0-{MAX_FLOOD_QUESTIONS} questions")
     return docs, questions
+
+
+OUTSIDE_SERVICES = (
+    ("api.openai.com", 443),
+    ("api.anthropic.com", 443),
+    ("huggingface.co", 443),
+    ("1.1.1.1", 443),
+)
+
+
+async def check_egress(probe: EgressProbe, store: OpsStore, actor: str) -> list[dict[str, Any]]:
+    outcomes = await asyncio.gather(*(probe.reach(host, port) for host, port in OUTSIDE_SERVICES))
+    results = [
+        {"host": host, "port": port, "reachable": reachable, "detail": detail}
+        for (host, port), (reachable, detail) in zip(OUTSIDE_SERVICES, outcomes, strict=True)
+    ]
+    reachable = [result["host"] for result in results if result["reachable"]]
+    await store.record(
+        "ops.egress-check",
+        actor,
+        {"blocked": len(results) - len(reachable), "total": len(results), "reachable": reachable},
+    )
+    return results

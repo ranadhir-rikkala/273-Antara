@@ -167,3 +167,34 @@ def test_floods_are_bounded() -> None:
     for docs, questions in ((0, 0), (1000, 0), (10, 500), (-1, 5)):
         with pytest.raises(services.ChaosError):
             services.validate_flood(docs, questions)
+
+
+class Probe:
+    def __init__(self, open_hosts: set[str]) -> None:
+        self.open_hosts = open_hosts
+        self.tried: list[tuple[str, int]] = []
+
+    async def reach(self, host: str, port: int) -> tuple[bool, str]:
+        self.tried.append((host, port))
+        return (True, "connected") if host in self.open_hosts else (False, "connection refused")
+
+
+async def test_egress_check_tries_every_outside_ai_service_and_records_the_result() -> None:
+    store, probe = Store(), Probe(set())
+    results = await services.check_egress(probe, store, "erin")
+    assert [result["host"] for result in results] == [host for host, _ in services.OUTSIDE_SERVICES]
+    assert all(result["reachable"] is False for result in results)
+    assert store.recorded == [
+        (
+            "ops.egress-check",
+            "erin",
+            {"blocked": len(services.OUTSIDE_SERVICES), "total": len(services.OUTSIDE_SERVICES), "reachable": []},
+        )
+    ]
+
+
+async def test_egress_check_names_any_outside_service_that_was_reachable() -> None:
+    store = Store()
+    await services.check_egress(Probe({"huggingface.co"}), store, "erin")
+    detail = store.recorded[0][2]
+    assert detail["reachable"] == ["huggingface.co"] and detail["blocked"] == detail["total"] - 1

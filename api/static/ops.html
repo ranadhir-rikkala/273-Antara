@@ -43,8 +43,9 @@
   @media (max-width: 1000px) { main { padding: 14px; } .top-inner { padding: 10px 14px; } }
   #denied { padding: 10px 12px; background: var(--brick-tint); color: var(--brick); border-radius: 4px; margin-bottom: 16px; }
 
-  .health { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
-  @media (max-width: 900px) { .health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
+  @media (max-width: 1100px) { .health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .stat { padding: 12px 16px; border-right: 1px solid var(--hair); }
   .stat:last-child { border-right: 0; }
   .stat .name { font-size: 12px; color: var(--muted); }
@@ -54,6 +55,17 @@
   .stat.bad .value { color: var(--brick); }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); flex: none; }
   .stat.bad .dot { background: var(--brick); }
+  .stat.sealed .value { color: var(--vault); }
+  .stat.sealed .dot { background: var(--vault); }
+  .sovereign-body { padding: 12px 16px; }
+  .sovereign-body p { margin: 0 0 10px; color: var(--soft); font-size: 12.5px; }
+  .prove { border: 1px solid var(--vault); background: var(--vault); color: var(--panel); border-radius: 4px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+  .prove:disabled { opacity: .5; cursor: default; }
+  .probe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 7px 16px; border-top: 1px solid var(--hair); font-size: 12.5px; align-items: baseline; }
+  .probe code { font: 12px/1.4 var(--mono); }
+  .probe .verdict { font: 600 10.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--vault); }
+  .probe .verdict.open { color: var(--brick); }
+  .probe small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; margin-top: -4px; }
 
   .grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
   @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
@@ -166,6 +178,14 @@
     </div>
     <div>
       <section class="panel">
+        <div class="panel-head"><h2>Data sovereignty</h2><span class="mod">M2 · M6 controlled egress</span></div>
+        <div class="sovereign-body">
+          <p>A default-deny network policy lets pods talk only to each other. The model, documents and answers never leave the cluster.</p>
+          <button class="prove" id="prove" type="button">Prove it: try to reach outside AI services</button>
+        </div>
+        <div id="probes"></div>
+      </section>
+      <section class="panel">
         <div class="panel-head"><h2>Failure drills</h2><small id="chaos-state"></small></div>
         <div id="chaos">
           <div class="action"><b>Kill an agent worker</b><p><span class="mod">M7</span>The question in progress finishes on another pod.</p><button class="danger" data-action="kill" data-target="agent">Run</button></div>
@@ -272,6 +292,7 @@ const EVENT_TEXT = {
   "chaos.flood-started": (d) => [`Flood started: ${d.documents} uploads, ${d.questions} questions`, "chaos"],
   "chaos.flood-finished": (d) => [`Flood finished: ${floodSummary(d.responses || {})}`, "info"],
   "ops.reconciler-triggered": () => ["Reconciler run requested", "info"],
+  "ops.egress-check": (d) => [`Egress check: ${d.blocked} of ${d.total} outside services blocked${d.reachable.length ? ` · reachable: ${d.reachable.join(", ")}` : ""}`, d.reachable.length ? "chaos" : "heal"],
 };
 
 const seenEvents = new Set();
@@ -325,6 +346,18 @@ function stat(name, value, hint, tone = "", dot = false) {
   return el("div", { class: `stat ${tone}` }, el("div", { class: "name" }, name), valueNode, el("div", { class: "hint" }, hint));
 }
 
+function lastEgressCheck(state) {
+  const event = state.events.find((item) => item.kind === "ops.egress-check");
+  return event ? { ...event.detail, at: new Date(event.at) } : null;
+}
+
+function egressStat(state) {
+  const check = lastEgressCheck(state);
+  if (!check) return stat("Internet access", "Not checked", "run the sovereignty check", "");
+  const sealed = check.blocked === check.total;
+  return stat("Internet access", sealed ? "Blocked" : "OPEN", `${check.blocked}/${check.total} outside AI services refused · ${ago(check.at)}`, sealed ? "sealed" : "bad", true);
+}
+
 function mechanism(title, modules, value, how, tone = "") {
   return el("div", { class: `mech ${tone}` },
     el("div", { class: "mech-head" }, el("b", {}, title), el("span", { class: "mod" }, modules)),
@@ -352,6 +385,7 @@ function render(state) {
     stat("Queued tasks", s.backlog, "waiting for a worker", s.backlog > 20 ? "warn" : ""),
     stat("Refused by API", apiRefused, "HTTP 429 since last restart", apiRefused ? "warn" : ""),
     stat("Refused by model gateway", modelRefused, "HTTP 429 since last restart", modelRefused ? "warn" : ""),
+    egressStat(state),
     stat("Model", modelDown ? "Down" : "Healthy", state.model.chaos ? "failure drill running" : "served inside the cluster", modelDown ? "bad" : "", true),
   );
 
@@ -394,7 +428,10 @@ function render(state) {
   const reports = state.incidents.reduce((sum, incident) => sum + incident.reporters, 0);
   const gpuReady = readyCount("ingest-gpu");
   const scaledOut = SERVICES.filter((service) => service.max && (podsByApp.get(service.app) || []).length > 1).length;
+  const egress = lastEgressCheck(state);
   $("mechanisms").replaceChildren(
+    mechanism("Controlled egress", "M2 · M6", egress ? `${egress.blocked}/${egress.total} outside services blocked` : "not checked yet",
+      "Default-deny network policy: no pod can open a connection to the internet.", egress && egress.blocked === egress.total ? "active" : egress ? "alert" : ""),
     mechanism("Asynchronous messaging", "M5", `${s.backlog} queued · 5 queues`,
       "The API hands work to Temporal task queues and returns 202; workers process it later.", s.backlog ? "active" : ""),
     mechanism("Independent scaling", "M6", SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),
@@ -479,6 +516,25 @@ $("chaos").addEventListener("click", async (event) => {
     $("notice").textContent = error.message;
   } finally {
     button.disabled = false;
+    refresh();
+  }
+});
+
+$("prove").addEventListener("click", async () => {
+  const button = $("prove");
+  button.disabled = true;
+  button.textContent = "Trying to connect from inside the cluster…";
+  try {
+    const results = await call("/ops/egress-check", {});
+    $("probes").replaceChildren(...results.map((result) => el("div", { class: "probe" },
+      el("code", {}, `${result.host}:${result.port}`),
+      el("span", { class: `verdict ${result.reachable ? "open" : ""}` }, result.reachable ? "Reachable" : "Blocked"),
+      el("small", {}, result.detail))));
+  } catch (error) {
+    $("probes").replaceChildren(el("div", { class: "probe" }, el("span", {}, error.message)));
+  } finally {
+    button.disabled = false;
+    button.textContent = "Prove it: try to reach outside AI services";
     refresh();
   }
 });

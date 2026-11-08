@@ -45,3 +45,7 @@ class OpsStore(Protocol):
 
 class ReconcilerTrigger(Protocol):
     async def run_now(self) -> None: ...
+
+
+class EgressProbe(Protocol):
+    async def reach(self, host: str, port: int) -> tuple[bool, str]: ...

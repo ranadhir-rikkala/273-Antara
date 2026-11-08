@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -215,3 +216,27 @@ class PostgresOpsStore:
                 (version_id,),
             )
         return {"document_id": document_id, "version_id": version_id, "title": title, "embeddings_deleted": broken}
+
+
+class SocketEgressProbe:
+    def __init__(self, timeout: float = 3.0) -> None:
+        self._timeout = timeout
+
+    async def reach(self, host: str, port: int) -> tuple[bool, str]:
+        try:
+            _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), self._timeout)
+        except TimeoutError:
+            return False, f"no answer within {self._timeout:g} s"
+        except OSError as error:
+            return False, self.explain(error)
+        writer.close()
+        return True, "connected"
+
+    @staticmethod
+    def explain(error: OSError) -> str:
+        text = str(error)
+        if isinstance(error, ConnectionRefusedError) or "Errno 111" in text:
+            return "connection refused"
+        if error.errno == 101 or "Errno 101" in text:
+            return "network unreachable"
+        return error.strerror or type(error).__name__

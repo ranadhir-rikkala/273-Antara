@@ -13,6 +13,7 @@ from api.ops.adapters import (
     KubernetesCluster,
     PostgresOpsStore,
     PrometheusMetrics,
+    SocketEgressProbe,
     TemporalReconcilerTrigger,
     TemporalWorkflows,
 )
@@ -148,3 +149,10 @@ async def reconcile(
 ) -> dict[str, str]:
     await services.run_reconciler(TemporalReconcilerTrigger(client), ops, user.user_id)
     return {"reconciler": "triggered"}
+
+
+@router.post("/egress-check")
+async def egress_check(
+    user: UserContext = Depends(operator), ops: PostgresOpsStore = Depends(store)
+) -> list[dict[str, Any]]:
+    return await services.check_egress(SocketEgressProbe(), ops, user.user_id)

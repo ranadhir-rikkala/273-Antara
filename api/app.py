@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
@@ -197,7 +198,8 @@ async def start_run(
         id=run_id,
         task_queue=AGENT,
     )
-    return {"run_id": run_id}
+    trace_id = trace.get_current_span().get_span_context().trace_id
+    return {"run_id": run_id, "trace_id": format(trace_id, "032x") if trace_id else ""}
 
 
 @app.get("/agent/runs/{run_id}")
