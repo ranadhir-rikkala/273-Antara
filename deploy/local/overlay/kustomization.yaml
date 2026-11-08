@@ -44,6 +44,8 @@ patches:
       - {op: add, path: /data/MAX_DOCUMENTS_IN_FLIGHT, value: "60"}
       - {op: add, path: /data/ACCESS_READ_SECONDS, value: "180"}
       - {op: add, path: /data/ACCESS_WRITE_SECONDS, value: "120"}
+      - {op: add, path: /data/MODEL_CATALOG_URL, value: "http://ollama:11434"}
+      - {op: add, path: /data/PINNED_MODEL_DIGESTS, value: '{"qwen2.5:1.5b": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b", "nomic-embed-text:latest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"}'}
   - target: {kind: Deployment, name: gateway}
     patch: |-
       - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama:11434/v1"}

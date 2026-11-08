@@ -411,7 +411,8 @@ function render(state) {
   const s = state.summary;
   const apiRefused = Math.round(state.metrics.rejected_429 ?? 0);
   const modelRefused = Math.round(state.metrics.model_busy_429 ?? 0);
-  const modelDown = state.model.chaos || !state.model.ok;
+  const verified = state.model.models?.verified;
+  const modelDown = state.model.chaos || !state.model.ok || verified === false;
   const podsByApp = new Map();
   for (const pod of state.pods) {
     if (!podsByApp.has(pod.app)) podsByApp.set(pod.app, []);
@@ -428,7 +429,9 @@ function render(state) {
     stat("Refused by API", apiRefused, "HTTP 429 since last restart", apiRefused ? "warn" : ""),
     stat("Refused by model gateway", modelRefused, "HTTP 429 since last restart", modelRefused ? "warn" : ""),
     egressStat(state),
-    stat("Model", modelDown ? "Down" : "Healthy", state.model.chaos ? "failure drill running" : "served inside the cluster", modelDown ? "bad" : "", true),
+    stat("Model", verified === false ? "Unverified" : modelDown ? "Down" : "Healthy",
+      state.model.chaos ? "failure drill running" : verified === false ? `digest mismatch: ${state.model.models.unverified.join(", ")}` : verified ? "in-cluster · digests verified" : "served inside the cluster",
+      modelDown ? "bad" : "", true),
   );
 
   $("services").replaceChildren(...SERVICES.map((service) => {

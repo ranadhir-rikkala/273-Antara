@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: jaeger
-          image: jaegertracing/all-in-one:1.62.0
+          image: jaegertracing/all-in-one:1.62.0@sha256:836e9b69c88afbedf7683ea7162e179de63b1f981662e83f5ebb68badadc710f
           env:
             - {name: COLLECTOR_OTLP_ENABLED, value: "true"}
             - {name: QUERY_BASE_PATH, value: /jaeger}
@@ -76,7 +76,7 @@ spec:
       serviceAccountName: prometheus
       containers:
         - name: prometheus
-          image: prom/prometheus:v2.55.0
+          image: prom/prometheus:v2.55.0@sha256:378f4e03703557d1c6419e6caccf922f96e6d88a530f7431d66a4c4f4b1000fe
           args: ["--config.file=/etc/prometheus/prometheus.yml", "--web.external-url=/prometheus/", "--web.route-prefix=/"]
           ports: [{containerPort: 9090}]
           volumeMounts:
@@ -107,7 +107,7 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: grafana/grafana:11.3.0
+          image: grafana/grafana:11.3.0@sha256:a0f881232a6fb71a0554a47d0fe2203b6888fe77f4cefb7ea62bed7eb54e13c3
           env:
             - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "true"}
             - {name: GF_AUTH_ANONYMOUS_ORG_ROLE, value: Viewer}

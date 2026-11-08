@@ -34,3 +34,15 @@ class PrometheusGatewayMetrics:
 
     def finished(self, kind: str) -> None:
         INFLIGHT.labels(kind).dec()
+
+
+class OllamaCatalog:
+    def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._base_url = base_url
+        self._transport = transport
+
+    async def digests(self) -> dict[str, str]:
+        async with httpx.AsyncClient(base_url=self._base_url, timeout=5.0, transport=self._transport) as client:
+            response = await client.get("/api/tags")
+        response.raise_for_status()
+        return {model["name"]: model["digest"] for model in response.json().get("models", [])}

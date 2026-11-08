@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from common.config import settings
 from common.telemetry import setup_tracing
-from gateway.adapters import HttpxUpstream, PrometheusGatewayMetrics
+from gateway.adapters import HttpxUpstream, OllamaCatalog, PrometheusGatewayMetrics
 from gateway.services import BUSY_RETRY_AFTER_SECONDS, Gateway, Lane, ModelBusy, ModelUnavailable
 
 
@@ -20,7 +20,12 @@ chat_upstream = HttpxUpstream("chat", settings.llm_upstream_url)
 embed_upstream = HttpxUpstream("embed", settings.embed_upstream_url or settings.llm_upstream_url)
 chat = Lane("chat", settings.gateway_max_inflight_chat, chat_upstream)
 embed = Lane("embed", settings.gateway_max_inflight_embed, embed_upstream)
-gateway = Gateway(settings.gateway_wait_seconds, PrometheusGatewayMetrics())
+gateway = Gateway(
+    settings.gateway_wait_seconds,
+    PrometheusGatewayMetrics(),
+    catalog=OllamaCatalog(settings.model_catalog_url) if settings.model_catalog_url else None,
+    pinned=settings.pinned_model_digests,
+)
 
 
 @asynccontextmanager
@@ -48,7 +53,7 @@ async def model_busy(_: Request, error: ModelBusy) -> JSONResponse:
 
 @app.get("/healthz")
 async def healthz() -> dict[str, object]:
-    return {"ok": True, "chaos": gateway.failing()}
+    return {"ok": True, "chaos": gateway.failing(), "models": await gateway.verify()}
 
 
 @app.post("/admin/chaos")

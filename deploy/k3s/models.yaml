@@ -25,7 +25,7 @@ spec:
         - {key: antara/gpu, operator: Exists, effect: NoSchedule}
       containers:
         - name: vllm
-          image: vllm/vllm-openai:v0.6.4
+          image: vllm/vllm-openai:v0.6.4@sha256:a92879ddd1317c5040065d3d48eccfa06554702712c8965479ce2429f8d423d6
           args:
             - --model=/models/Qwen2.5-7B-Instruct-AWQ
             - --served-model-name=qwen2.5-7b-instruct
@@ -79,7 +79,7 @@ spec:
         - {key: antara/gpu, operator: Exists, effect: NoSchedule}
       containers:
         - name: tei
-          image: ghcr.io/huggingface/text-embeddings-inference:turing-1.5
+          image: ghcr.io/huggingface/text-embeddings-inference:turing-1.5@sha256:12fdecf9f92879d19a446b670b168b40a8bada4fc33c4b1673a11982b0612938
           args: ["--model-id=/models/nomic-embed-text-v1.5", "--served-model-name=nomic-embed-text-v1.5"]
           env:
             - {name: HF_HUB_OFFLINE, value: "1"}
@@ -117,7 +117,7 @@ spec:
     spec:
       containers:
         - name: tei
-          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5@sha256:4734c8b3c4b13ef92a61016e8c3bd07f2157dd14da6e3fea639f6c6d54ffbff9
           args: ["--model-id=/models/nomic-embed-text-v1.5", "--served-model-name=nomic-embed-text-v1.5"]
           env:
             - {name: HF_HUB_OFFLINE, value: "1"}
