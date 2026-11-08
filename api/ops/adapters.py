@@ -150,6 +150,17 @@ class PostgresOpsStore:
                     "ON v.document_id = d.document_id WHERE d.deleted_at IS NULL GROUP BY v.status"
                 )
             ).fetchall()
+            harness = await (
+                await conn.execute(
+                    "SELECT CASE WHEN action LIKE 'harness.%%' THEN substr(action, 9) "
+                    "WHEN action = 'agent.retrieve' THEN 'searches' "
+                    "WHEN action LIKE 'tool.%%' THEN 'tool-actions' "
+                    "ELSE 'approvals' END, count(*) FROM audit_log "
+                    "WHERE action LIKE 'harness.%%' OR action LIKE 'tool.%%' "
+                    "OR action IN ('agent.retrieve', 'approval.opened') "
+                    "GROUP BY 1"
+                )
+            ).fetchall()
         keys = (
             "approvals_pending",
             "approvals_escalated",
@@ -158,7 +169,7 @@ class PostgresOpsStore:
             "access_grants",
             "leases_active",
         )
-        return {**dict(zip(keys, row, strict=True)), "documents": dict(documents)}
+        return {**dict(zip(keys, row, strict=True)), "documents": dict(documents), "harness": dict(harness)}
 
     async def open_incidents(self, limit: int) -> list[dict[str, Any]]:
         async with self._pool.connection() as conn:

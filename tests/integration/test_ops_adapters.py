@@ -42,3 +42,22 @@ async def test_counts_only_unrevoked_grants_and_the_leases_among_them(db) -> Non
         )
     counts = await PostgresOpsStore(db).counts()
     assert (counts["access_grants"], counts["leases_active"]) == (2, 1)
+
+
+async def test_counts_what_the_harness_did_from_the_audit_log(db) -> None:
+    async with db.connection() as conn:
+        await conn.execute(
+            "INSERT INTO audit_log (actor_id, action, detail) VALUES "
+            "('agent', 'harness.answered-from-sources', '{}'), ('agent', 'harness.answered-from-sources', '{}'), "
+            "('agent', 'harness.secrets-redacted', '{}'), ('alice', 'agent.retrieve', '{}'), "
+            "('alice', 'tool.create_ticket', '{}'), ('alice', 'tool.request_access', '{}'), "
+            "('alice', 'approval.opened', '{}'), ('alice', 'document.deleted', '{}')"
+        )
+    harness = (await PostgresOpsStore(db).counts())["harness"]
+    assert harness == {
+        "answered-from-sources": 2,
+        "secrets-redacted": 1,
+        "searches": 1,
+        "tool-actions": 2,
+        "approvals": 1,
+    }

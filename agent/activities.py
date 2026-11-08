@@ -47,7 +47,9 @@ async def retrieve_documents(request: RetrieveRequest) -> list[ChunkResult]:
 @activity.defn(name=Activities.GENERATE)
 async def generate_answer(request: GenerateRequest) -> ModelTurn:
     async with model_session() as model:
-        return await services.generate(request, model, settings.answer_min_score)
+        turn = await services.generate(request, model, settings.answer_min_score)
+    await services.record_harness(turn, activity.info().workflow_id, PostgresAuditLog(await pool()))
+    return turn
 
 
 @activity.defn(name=Activities.EXECUTE_TOOL)
@@ -102,9 +104,12 @@ async def report_incident(report: IncidentReport) -> IncidentResult:
 @activity.defn(name=Activities.CACHE_LOOKUP)
 async def lookup_cached_answer(request: CacheLookupRequest) -> CachedAnswer | None:
     async with model_session() as model:
-        return await services.lookup_cached_answer(
+        cached = await services.lookup_cached_answer(
             request, model, PostgresAnswerCache(await pool()), settings.cache_ttl_hours, settings.cache_similarity
         )
+    if cached is not None:
+        await services.record_cached_harness(cached, activity.info().workflow_id, PostgresAuditLog(await pool()))
+    return cached
 
 
 @activity.defn(name=Activities.CACHE_STORE)

@@ -57,11 +57,25 @@
   .stat.bad .dot { background: var(--brick); }
   .stat.sealed .value { color: var(--vault); }
   .stat.sealed .dot { background: var(--vault); }
-  .sovereign-body { padding: 12px 16px; }
-  .sovereign-body p { margin: 0 0 10px; color: var(--soft); font-size: 12.5px; }
+  .harness-panel { border-top: 3px solid var(--vault); }
+  .harness { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  @media (max-width: 1250px) { .harness { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .harness { grid-template-columns: minmax(0, 1fr); } }
+  .layer { padding: 14px 16px 16px; border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .layer-head { display: flex; align-items: center; gap: 8px; }
+  .layer-head .n { width: 20px; height: 20px; border-radius: 50%; background: var(--vault); color: var(--panel); font: 600 11px/20px var(--mono); text-align: center; flex: none; }
+  .layer-head b { font-size: 13px; }
+  .layer .value { font-size: 15px; font-weight: 600; color: var(--vault); font-variant-numeric: tabular-nums; }
+  .layer .value.alert { color: var(--brick); }
+  .layer p { margin: 0; font-size: 12px; color: var(--soft); }
+  .layer .try { font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--hair); padding-top: 6px; margin-top: auto; }
+  .layer .try b { font-weight: 600; color: var(--soft); }
+  #probes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 900px) { #probes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .prove { border: 1px solid var(--vault); background: var(--vault); color: var(--panel); border-radius: 4px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
   .prove:disabled { opacity: .5; cursor: default; }
-  .probe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 7px 16px; border-top: 1px solid var(--hair); font-size: 12.5px; align-items: baseline; }
+  .layer .prove { align-self: flex-start; margin-top: auto; }
+  .probe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 8px 16px; border-right: 1px solid var(--hair); font-size: 12.5px; align-items: baseline; }
   .probe code { font: 12px/1.4 var(--mono); }
   .probe .verdict { font: 600 10.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--vault); }
   .probe .verdict.open { color: var(--brick); }
@@ -159,6 +173,42 @@
   <div id="denied" hidden></div>
   <div id="dashboard">
   <div class="health" id="health"></div>
+  <section class="panel harness-panel">
+    <div class="panel-head"><h2>AI harness</h2><small>Five controls in code, not in the prompt, wrap every answer. The small model is never trusted on its own.</small></div>
+    <div class="harness">
+      <div class="layer">
+        <div class="layer-head"><span class="n">1</span><b>Stays inside the network</b></div>
+        <div class="value" id="h-network">not checked yet</div>
+        <p>Default-deny egress policy. Each answer's trace lists every host it called.</p>
+        <button class="prove" id="prove" type="button">Prove it: try to reach outside AI services</button>
+      </div>
+      <div class="layer">
+        <div class="layer-head"><span class="n">2</span><b>Sees only what you may see</b></div>
+        <div class="value" id="h-access"></div>
+        <p>The vector search filters by the asker's groups before the model sees any passage.</p>
+        <div class="try"><b>Try:</b> as bob, click “API rate limits”. Nothing is found.</div>
+      </div>
+      <div class="layer">
+        <div class="layer-head"><span class="n">3</span><b>Answers only from sources</b></div>
+        <div class="value" id="h-grounded"></div>
+        <p>If no passage scores 0.6 or more, the model is never called. It says it could not find it.</p>
+        <div class="try"><b>Try:</b> ask “What is the parking policy?”</div>
+      </div>
+      <div class="layer">
+        <div class="layer-head"><span class="n">4</span><b>Filters what goes in and out</b></div>
+        <div class="value" id="h-filtered"></div>
+        <p>Injected instructions are stripped from passages. Secrets and requests for credentials never reach the user.</p>
+        <div class="try"><b>Try:</b> as dave, click “Signing key”. It comes back redacted.</div>
+      </div>
+      <div class="layer">
+        <div class="layer-head"><span class="n">5</span><b>Acts only with permission</b></div>
+        <div class="value" id="h-actions"></div>
+        <p>Tools only for action requests, checked against the group, approved by a manager, run once per key.</p>
+        <div class="try"><b>Try:</b> as alice, request prod database access. carol approves.</div>
+      </div>
+    </div>
+    <div id="probes"></div>
+  </section>
   <div class="grid">
     <div>
       <section class="panel">
@@ -177,14 +227,6 @@
       </section>
     </div>
     <div>
-      <section class="panel">
-        <div class="panel-head"><h2>Data sovereignty</h2><span class="mod">M2 · M6 controlled egress</span></div>
-        <div class="sovereign-body">
-          <p>A default-deny network policy lets pods talk only to each other. The model, documents and answers never leave the cluster.</p>
-          <button class="prove" id="prove" type="button">Prove it: try to reach outside AI services</button>
-        </div>
-        <div id="probes"></div>
-      </section>
       <section class="panel">
         <div class="panel-head"><h2>Failure drills</h2><small id="chaos-state"></small></div>
         <div id="chaos">
@@ -429,9 +471,15 @@ function render(state) {
   const gpuReady = readyCount("ingest-gpu");
   const scaledOut = SERVICES.filter((service) => service.max && (podsByApp.get(service.app) || []).length > 1).length;
   const egress = lastEgressCheck(state);
+  const h = state.counts.harness || {};
+  const sealed = egress && egress.blocked === egress.total;
+  $("h-network").textContent = egress ? `${egress.blocked}/${egress.total} outside AI services blocked` : "not checked yet";
+  $("h-network").classList.toggle("alert", Boolean(egress && !sealed));
+  $("h-access").textContent = `${h.searches || 0} searches filtered by group`;
+  $("h-grounded").textContent = `${h["answered-from-sources"] || 0} grounded · ${h["refused-ungrounded"] || 0} refused`;
+  $("h-filtered").textContent = `${h["secrets-redacted"] || 0} redacted · ${h["injection-stripped"] || 0} injections · ${h["unsafe-answer-blocked"] || 0} unsafe`;
+  $("h-actions").textContent = `${h.approvals || 0} approvals · ${h["tool-actions"] || 0} keyed actions`;
   $("mechanisms").replaceChildren(
-    mechanism("Controlled egress", "M2 · M6", egress ? `${egress.blocked}/${egress.total} outside services blocked` : "not checked yet",
-      "Default-deny network policy: no pod can open a connection to the internet.", egress && egress.blocked === egress.total ? "active" : egress ? "alert" : ""),
     mechanism("Asynchronous messaging", "M5", `${s.backlog} queued · 5 queues`,
       "The API hands work to Temporal task queues and returns 202; workers process it later.", s.backlog ? "active" : ""),
     mechanism("Independent scaling", "M6", SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),

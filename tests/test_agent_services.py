@@ -3,12 +3,14 @@ import pytest
 from agent import services
 from common.models import (
     ApprovalOpenRequest,
+    CachedAnswer,
     CacheLookupRequest,
     CacheStoreRequest,
     ChunkResult,
     GenerateRequest,
     IncidentReport,
     Intent,
+    ModelTurn,
     RetrieveRequest,
     ToolCall,
     ToolRequest,
@@ -316,3 +318,39 @@ async def test_unsafe_or_secret_bearing_answers_are_replaced_or_redacted() -> No
         GenerateRequest("vpn?", [VPN_CHUNK], allow_tools=False), FakeModel(reply="Token ANTARA-CANARY-AB12 [1]"), 0.6
     )
     assert "CANARY" not in leaky.answer and "secrets-redacted" in leaky.flags
+
+
+def test_harness_events_name_what_the_safety_net_did_for_one_answer() -> None:
+    assert services.harness_events(ModelTurn(answer=services.NOT_FOUND_ANSWER)) == ["refused-ungrounded"]
+    assert services.harness_events(ModelTurn(answer="Rotate every 180 days [1].")) == ["answered-from-sources"]
+    assert services.harness_events(ModelTurn(answer="Key is [redacted].", flags=["secrets-redacted"])) == [
+        "secrets-redacted",
+        "answered-from-sources",
+    ]
+    assert services.harness_events(
+        ModelTurn(answer=services.UNSAFE_ANSWER, flags=["injection-stripped", "unsafe-answer-blocked"])
+    ) == ["injection-stripped", "unsafe-answer-blocked"]
+    assert services.harness_events(ModelTurn(answer="Which system do you need access to?", needs_input=True)) == []
+    assert services.harness_events(ModelTurn(tool_call=ToolCall("create_ticket", {}))) == []
+
+
+async def test_harness_events_are_written_to_the_audit_log_with_the_run() -> None:
+    audit = FakeAudit()
+    await services.record_harness(ModelTurn(answer="Key is [redacted].", flags=["secrets-redacted"]), "agent-1", audit)
+    assert audit.entries == [
+        ("agent", "harness.secrets-redacted", {"run_id": "agent-1"}),
+        ("agent", "harness.answered-from-sources", {"run_id": "agent-1"}),
+    ]
+
+
+def test_a_redacted_answer_counts_as_a_redaction_even_without_the_flag() -> None:
+    assert services.harness_events(ModelTurn(answer="The signing key is [redacted].")) == [
+        "secrets-redacted",
+        "answered-from-sources",
+    ]
+
+
+async def test_a_cached_answer_records_what_the_harness_did_when_it_was_first_answered() -> None:
+    audit = FakeAudit()
+    await services.record_cached_harness(CachedAnswer("The key is [redacted].", []), "agent-2", audit)
+    assert [action for _, action, _ in audit.entries] == ["harness.secrets-redacted", "harness.answered-from-sources"]

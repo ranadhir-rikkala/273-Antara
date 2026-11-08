@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from agent.guard import redact_secrets, sanitize_passage, unsafe_answer
+from agent.guard import REDACTED, redact_secrets, sanitize_passage, unsafe_answer
 from agent.ports import (
     AnswerCache,
     ApprovalStore,
@@ -106,6 +106,26 @@ def guard_answer(answer: str, flags: list[str]) -> ModelTurn:
         return ModelTurn(answer=UNSAFE_ANSWER, flags=[*flags, "unsafe-answer-blocked"])
     redacted, count = redact_secrets(answer)
     return ModelTurn(answer=redacted, flags=[*flags, "secrets-redacted"] if count else flags)
+
+
+def harness_events(turn: ModelTurn) -> list[str]:
+    if turn.answer == NOT_FOUND_ANSWER:
+        return ["refused-ungrounded"]
+    if turn.tool_call is not None or turn.needs_input or not turn.answer:
+        return []
+    if "unsafe-answer-blocked" in turn.flags:
+        return list(turn.flags)
+    redacted = ["secrets-redacted"] if REDACTED in turn.answer and "secrets-redacted" not in turn.flags else []
+    return [*turn.flags, *redacted, "answered-from-sources"]
+
+
+async def record_harness(turn: ModelTurn, run_id: str, audit: AuditLog) -> None:
+    for event in harness_events(turn):
+        await audit.record("agent", f"harness.{event}", {"run_id": run_id})
+
+
+async def record_cached_harness(cached: CachedAnswer, run_id: str, audit: AuditLog) -> None:
+    await record_harness(ModelTurn(answer=cached.answer), run_id, audit)
 
 
 async def generate(request: GenerateRequest, model: ChatModel, min_score: float = 0.0) -> ModelTurn:

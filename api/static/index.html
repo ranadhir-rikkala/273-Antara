@@ -89,12 +89,23 @@
   .composer button { border: 0; background: var(--ink); color: var(--paper); padding: 0 20px; cursor: pointer; font-weight: 600; }
   .composer button:hover { background: var(--vault); color: var(--vault-ink); }
   .error { color: var(--brick); font-size: 13px; min-height: 20px; margin-top: 6px; }
-  .provenance { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--vault);
-                border: 1px solid var(--vault-tint); background: var(--vault-tint); border-radius: 4px; padding: 6px 10px; }
-  .provenance.pending { color: var(--muted); background: transparent; border-style: dashed; border-color: var(--line); }
-  .provenance.leak { color: var(--brick); background: var(--brick-tint); border-color: transparent; }
-  .provenance code { font: 11.5px/1.4 var(--mono); }
-  .provenance a { margin-left: auto; font-size: 12px; }
+  .receipt { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+  .receipt-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--hair); }
+  .receipt-head a { font-size: 12px; }
+  .checks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  @media (max-width: 760px) { .checks { grid-template-columns: minmax(0, 1fr); } }
+  .check { padding: 8px 10px; border-right: 1px solid var(--hair); min-width: 0; }
+  .check:last-child { border-right: 0; }
+  .check .label { display: block; margin-bottom: 3px; }
+  .check span.text { display: flex; gap: 5px; font-size: 12.5px; line-height: 1.35; }
+  .check i { font-style: normal; font-weight: 700; flex: none; }
+  .check.ok i { color: var(--good); }
+  .check.acted { background: var(--amber-tint); }
+  .check.acted i { color: var(--amber); }
+  .check.leak { background: var(--brick-tint); }
+  .check.leak i, .check.leak .text { color: var(--brick); }
+  .check.na .text { color: var(--muted); }
+  .check.pending .text { color: var(--muted); }
 
   .clearance { margin-top: 22px; }
   .clearance-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -419,8 +430,10 @@ function botShell() {
 function renderBot(node, state) {
   const body = node.body;
   body.replaceChildren();
-  const waiting = !state.answer && !terminal.has(state.status);
-  body.append(el("div", { class: `answer${waiting ? " working" : ""}` }, state.answer || (waiting ? "Searching your documents" : "No answer.")));
+  const held = ["WAITING_APPROVAL", "ESCALATED"].includes(state.status);
+  const waiting = !state.answer && !terminal.has(state.status) && !held;
+  const placeholder = held ? `Your request is waiting for a manager's approval${state.escalated ? " (escalated to security leads)" : ""}.` : waiting ? "Searching your documents" : "No answer.";
+  body.append(el("div", { class: `answer${waiting ? " working" : ""}` }, state.answer || placeholder));
   const meta = el("div", { class: "meta" }, statusChip(state));
   if (state.intent) meta.append(el("span", { class: "chip" }, state.intent));
   if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
@@ -432,7 +445,7 @@ function renderBot(node, state) {
   body.append(meta);
   const citations = state.citations || [];
   const strong = citations.filter((cite) => cite.score >= STRONG_MATCH).length;
-  if (!strong || !state.answer) return;
+  if (!strong || !state.answer) { if (node.receipt) body.append(node.receipt); return; }
   const sources = el("details", { class: "sources" },
     el("summary", {}, `${strong} strong source${strong > 1 ? "s" : ""}, ${citations.length - strong} related`));
   citations.forEach((cite, index) => {
@@ -446,6 +459,42 @@ function renderBot(node, state) {
         el("p", {}, `${cite.text.slice(0, 200)}${cite.text.length > 200 ? "…" : ""}`))));
   });
   body.append(sources);
+  if (node.receipt) body.append(node.receipt);
+}
+
+const REFUSED = "I couldn't find that in company documents";
+const FLAG_TEXT = {
+  "secrets-redacted": "Secret redacted",
+  "injection-stripped": "Injected instruction removed",
+  "unsafe-answer-blocked": "Unsafe answer blocked",
+};
+
+function harnessChecks(state, groups) {
+  const flags = state.flags || [];
+  const strong = (state.citations || []).filter((cite) => cite.score >= STRONG_MATCH).length;
+  const refused = (state.answer || "").startsWith(REFUSED);
+  const searched = state.intent !== "incident";
+  const tools = state.tool_results || [];
+  const access = searched
+    ? ["ok", state.cached ? `Cached answer for ${groups} only` : `Searched only what ${groups} may read`]
+    : ["na", "No document search"];
+  const grounded = refused ? ["acted", "Refused: no permitted source strong enough"]
+    : strong ? ["ok", `Based on ${strong} strong source${strong > 1 ? "s" : ""}`]
+    : state.cached ? ["ok", "Served from a grounded cached answer"]
+    : ["na", "Not a document answer"];
+  const shown = (state.answer || "").includes("[redacted]") && !flags.includes("secrets-redacted") ? [...flags, "secrets-redacted"] : flags;
+  const filtered = shown.length ? ["acted", shown.map((flag) => FLAG_TEXT[flag] || flag).join(" · ")] : ["ok", "No secrets or injected text"];
+  const actions = state.status === "DENIED" ? ["acted", "Refused: not allowed for your group"]
+    : state.approval_id && !tools.length ? ["acted", "Held for manager approval"]
+    : tools.length ? ["ok", `Ran once · key ${tools[0].idempotency_key.slice(-12)}`]
+    : state.needs_input ? ["acted", "Asked for details before acting"]
+    : ["na", "No action taken"];
+  return { access, grounded, filtered, actions };
+}
+
+function check(label, [tone, text]) {
+  const mark = { ok: "✓", acted: "⚑", leak: "✕", na: "–", pending: "…" }[tone];
+  return el("div", { class: `check ${tone}` }, el("span", { class: "label" }, label), el("span", { class: "text" }, el("i", {}, mark), text));
 }
 
 function insideCluster(host) {
@@ -453,9 +502,7 @@ function insideCluster(host) {
     || /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
 }
 
-async function showProvenance(node, traceId) {
-  const line = el("div", { class: "provenance pending" }, "Checking where this answer's network calls went…");
-  node.body.append(line);
+async function networkCheck(traceId) {
   for (let attempt = 0; attempt < 8; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 2500));
     try {
@@ -463,42 +510,46 @@ async function showProvenance(node, traceId) {
       if (!response.ok) continue;
       const trace = (await response.json()).data?.[0];
       if (!trace) continue;
-      const firstSeen = new Map();
-      for (const span of [...trace.spans].sort((a, b) => a.startTime - b.startTime)) {
-        const name = trace.processes[span.processID].serviceName;
-        if (!firstSeen.has(name)) firstSeen.set(name, span.startTime);
-      }
-      const services = [...firstSeen.keys()];
       const hosts = new Set();
       for (const span of trace.spans) {
         const tags = Object.fromEntries(span.tags.map((tag) => [tag.key, tag.value]));
-        if (tags["span.kind"] !== "client" || !tags["http.url"]) continue;
-        hosts.add(new URL(tags["http.url"]).host);
+        if (tags["span.kind"] === "client" && tags["http.url"]) hosts.add(new URL(tags["http.url"]).host);
       }
       const outside = [...hosts].filter((host) => !insideCluster(host.split(":")[0]));
-      const link = el("a", { href: `/jaeger/trace/${traceId}`, target: "_blank", rel: "noopener" }, `View trace · ${trace.spans.length} spans ↗`);
-      if (outside.length) {
-        line.className = "provenance leak";
-        line.replaceChildren(`Calls left the cluster: ${outside.join(", ")}`, link);
-      } else {
-        line.className = "provenance";
-        line.replaceChildren(
-          `✓ Answered inside the network · ${services.join(" → ")}`,
-          ...(hosts.size ? [" · calls to ", el("code", {}, [...hosts].join(", "))] : []),
-          " · 0 left the cluster",
-          link);
-      }
-      return;
+      if (outside.length) return [["leak", `Left the cluster: ${outside.join(", ")}`], trace.spans.length];
+      const called = [...hosts].map((host) => host.split(":")[0]);
+      return [["ok", called.length ? `Only called ${called.join(", ")}` : "No outbound calls"], trace.spans.length];
     } catch (_) {}
   }
-  line.replaceChildren("Trace not available yet.");
+  return [["na", "Trace not available"], 0];
 }
 
-async function poll(runId, node) {
+async function showReceipt(node, state, traceId) {
+  const groups = identity().groups.split(",").join(", ");
+  const checks = harnessChecks(state, groups);
+  const traceLink = traceId ? el("a", { href: `/jaeger/trace/${traceId}`, target: "_blank", rel: "noopener" }, "View trace ↗") : "";
+  const grid = el("div", { class: "checks" },
+    check("1 · Network", ["pending", "Checking this answer's trace"]),
+    check("2 · Access", checks.access),
+    check("3 · Grounding", checks.grounded),
+    check("4 · Filters", checks.filtered),
+    check("5 · Actions", checks.actions));
+  const receipt = el("div", { class: "receipt" }, el("div", { class: "receipt-head" }, el("span", { class: "label" }, "AI harness"), traceLink), grid);
+  node.receipt?.remove();
+  node.receipt = receipt;
+  node.body.append(receipt);
+  if (!traceId) { grid.firstChild.replaceWith(check("1 · Network", ["na", "Tracing is off"])); return; }
+  const [result, spans] = await networkCheck(traceId);
+  grid.firstChild.replaceWith(check("1 · Network", result));
+  if (spans && traceLink) traceLink.textContent = `View trace · ${spans} spans ↗`;
+}
+
+async function poll(runId, node, traceId) {
   for (let attempt = 0; attempt < 600; attempt++) {
     try {
       const state = await api(`/agent/runs/${runId}`);
       renderBot(node, state);
+      if (["WAITING_APPROVAL", "ESCALATED"].includes(state.status) && !node.receipt) showReceipt(node, state, traceId);
       $("chat").scrollTop = $("chat").scrollHeight;
       if (terminal.has(state.status)) return state;
     } catch (_) {}
@@ -523,9 +574,9 @@ $("ask").addEventListener("submit", async (event) => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ question, history: conversation.slice(-3) }),
     });
-    const final = await poll(run_id, bot);
+    const final = await poll(run_id, bot, trace_id);
     if (final && final.answer) conversation.push({ question, answer: final.answer });
-    if (final && trace_id) showProvenance(bot, trace_id);
+    if (final) showReceipt(bot, final, trace_id);
   } catch (error) {
     bot.remove();
     $("ask-error").textContent = error.message;
