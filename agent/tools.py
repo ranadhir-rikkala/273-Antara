@@ -72,8 +72,15 @@ async def _get_ticket_status(workspace: ToolWorkspace, request: ToolRequest) -> 
 
 async def _request_access(workspace: ToolWorkspace, request: ToolRequest) -> dict[str, Any]:
     args = request.call.arguments
-    grant_id = await workspace.grants.grant(request.run_id, request.user.user_id, args["system"], args["role"])
-    return {"grant_id": grant_id, "system": args["system"], "role": args["role"], "status": "GRANTED"}
+    lease = workspace.lease_seconds.get(args["role"], min(workspace.lease_seconds.values()))
+    grant_id = await workspace.grants.grant(request.run_id, request.user.user_id, args["system"], args["role"], lease)
+    return {
+        "grant_id": grant_id,
+        "system": args["system"],
+        "role": args["role"],
+        "status": "GRANTED",
+        "lease_seconds": lease,
+    }
 
 
 Handler = Callable[[ToolWorkspace, ToolRequest], Awaitable[dict[str, Any]]]

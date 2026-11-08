@@ -13,9 +13,10 @@ from agent.activities import (
     open_approval,
     report_incident,
     retrieve_documents,
+    revoke_access,
     store_cached_answer,
 )
-from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
+from agent.workflows import AccessLeaseWorkflow, AgentRunWorkflow, IncidentReportWorkflow
 from common.config import settings
 from common.queues import AGENT, TOOLS
 from common.temporal_client import connect
@@ -28,8 +29,15 @@ async def main() -> None:
         worker = Worker(
             client,
             task_queue=TOOLS,
-            workflows=[IncidentReportWorkflow],
-            activities=[execute_tool, open_approval, escalate_approval, expire_approval, report_incident],
+            workflows=[IncidentReportWorkflow, AccessLeaseWorkflow],
+            activities=[
+                revoke_access,
+                execute_tool,
+                open_approval,
+                escalate_approval,
+                expire_approval,
+                report_incident,
+            ],
             max_concurrent_activities=settings.max_concurrent_activities,
             graceful_shutdown_timeout=timedelta(seconds=25),
         )

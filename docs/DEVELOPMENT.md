@@ -118,17 +118,19 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 
 ### Next tasks by owner
 
-| Owner | Task |
-| --- | --- |
-| Ranadhir | Self-revoking access: a durable timer revokes grants after 30 or 7 days (compressed for the demo) |
-| Ranadhir | Incident command: status updates to reporters and auto-close |
-| Prajval | Seed script that uploads `demo/policies/` with the right groups for each document |
-| Prajval | Heartbeat the embedding activity: when KEDA removes an ingest pod mid-embedding, Temporal now waits the full 5-minute timeout before retrying; a heartbeat timeout would retry in seconds |
-| Vinayak | Separate the rules in `api/runs.py` and `api/auth.py` from Temporal and FastAPI, then add both to `tests/test_architecture.py` |
-| Vinayak | Demo UI: helpdesk and ops console side by side, with guided steps |
-| Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers |
-| Manoj | CI on GitHub Actions: `scripts/check.sh` on every push |
-| Manoj | `docs/DEMO.md` presenter script |
+| Owner | Task | Course module |
+| --- | --- | --- |
+| Ranadhir | Incident command: status updates to reporters and auto-close; send the updates through a transactional outbox so none is lost or sent twice | 4, 9 |
+| Prajval | Seed script that uploads `demo/policies/` with the right groups for each document | 2 |
+| Prajval | Fencing on document versions: activate a version only if it is newer than the active one, so a slow, stale ingest can never replace a newer document | 7, 9 |
+| Vinayak | Separate the rules in `api/runs.py` and `api/auth.py` from Temporal and FastAPI, then add both to `tests/test_architecture.py` | 4 |
+| Vinayak | Circuit breaker in front of the model: stop calling it after repeated failures, then let one trial call through before reopening | 4, 6 |
+| Vinayak | Demo UI: helpdesk and ops console side by side, with guided steps | — |
+| Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers | 6 |
+| Manoj | CI on GitHub Actions: `scripts/check.sh` on every push | 2 |
+| Manoj | `docs/DEMO.md` presenter script | — |
+
+Already built from the course, for the report: graceful worker shutdown with activity heartbeats (module 6), and self-revoking access as a lease whose durable timer runs the compensating revoke (modules 7 and 9).
 
 Everyone shares the report and slides; each person writes the section for the promises they present. If you use an AI coding assistant, point it at [AGENTS.md](../AGENTS.md): business rules stay in `services.py` behind `ports.py`, and every outside system is reached through an adapter, so any component can be swapped later. `tests/test_architecture.py` enforces this: it fails if a service or port imports anything but the standard library, `common/models.py`, `common/names.py`, `common/queues.py` or other business logic. Add each new service or port file to its list.
 

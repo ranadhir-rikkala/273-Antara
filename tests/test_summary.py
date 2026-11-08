@@ -18,3 +18,14 @@ def test_found_ticket_status_and_unknown_tools_are_summarized() -> None:
         "Your user access to vpn was granted."
     )
     assert summarize_tool_result("future_tool", {}) == "Done: future_tool finished."
+
+
+def test_access_confirmations_say_when_the_access_ends() -> None:
+    granted = {"system": "prod-db", "role": "read", "lease_seconds": 30 * 86400}
+    assert summarize_tool_result("request_access", granted, "carol") == (
+        "Your read access to prod-db was granted after carol approved it. It ends automatically in 30 days."
+    )
+    assert summarize_tool_result("request_access", {**granted, "lease_seconds": 86400}).endswith("in 1 day.")
+    assert summarize_tool_result("request_access", {**granted, "lease_seconds": 7200}).endswith("in 2 hours.")
+    assert summarize_tool_result("request_access", {**granted, "lease_seconds": 180}).endswith("in 3 minutes.")
+    assert summarize_tool_result("request_access", {**granted, "lease_seconds": 45}).endswith("in 45 seconds.")

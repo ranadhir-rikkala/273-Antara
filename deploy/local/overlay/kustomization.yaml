@@ -48,6 +48,8 @@ patches:
       - {op: add, path: /data/RECONCILE_EVERY_SECONDS, value: "30"}
       - {op: add, path: /data/RECONCILE_STALE_MINUTES, value: "1"}
       - {op: add, path: /data/MAX_DOCUMENTS_IN_FLIGHT, value: "60"}
+      - {op: add, path: /data/ACCESS_READ_SECONDS, value: "180"}
+      - {op: add, path: /data/ACCESS_WRITE_SECONDS, value: "120"}
   - target: {kind: Deployment, name: gateway}
     patch: |-
       - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama:11434/v1"}

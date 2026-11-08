@@ -159,6 +159,14 @@ async def open_approval(request: ApprovalOpenRequest, store: ApprovalStore, audi
     return approval_id
 
 
+async def revoke_access(grant_id: str, unit_of_work: ToolUnitOfWork) -> bool:
+    async with unit_of_work.begin() as workspace:
+        revoked = await workspace.grants.revoke(grant_id)
+        if revoked:
+            await workspace.audit.record("system", "access.revoked", {"grant_id": grant_id})
+    return revoked
+
+
 async def escalate_approval(approval_id: str, store: ApprovalStore, audit: AuditLog) -> None:
     await store.escalate(approval_id)
     await audit.record("system", "approval.escalated", {"approval_id": approval_id})

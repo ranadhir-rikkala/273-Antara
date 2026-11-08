@@ -92,12 +92,12 @@ class _Grants:
     def __init__(self, conn: AsyncConnection) -> None:
         self._conn = conn
 
-    async def grant(self, run_id: str, requester_id: str, system: str, role: str) -> str:
+    async def grant(self, run_id: str, requester_id: str, system: str, role: str, lease_seconds: int) -> str:
         row = await (
             await self._conn.execute(
-                "INSERT INTO access_grants (run_id, requester_id, system, role) VALUES (%s, %s, %s, %s) "
-                "RETURNING grant_id::text",
-                (run_id, requester_id, system, role),
+                "INSERT INTO access_grants (run_id, requester_id, system, role, expires_at) "
+                "VALUES (%s, %s, %s, %s, now() + make_interval(secs => %s)) RETURNING grant_id::text",
+                (run_id, requester_id, system, role, lease_seconds),
             )
         ).fetchone()
         await self._conn.execute(
@@ -105,13 +105,20 @@ class _Grants:
         )
         return row[0]
 
+    async def revoke(self, grant_id: str) -> bool:
+        cursor = await self._conn.execute(
+            "UPDATE access_grants SET revoked_at = now() WHERE grant_id = %s AND revoked_at IS NULL", (grant_id,)
+        )
+        return cursor.rowcount == 1
+
 
 class _ToolWorkspace:
-    def __init__(self, conn: AsyncConnection) -> None:
+    def __init__(self, conn: AsyncConnection, lease_seconds: dict[str, int]) -> None:
         self._conn = conn
         self.tickets = _Tickets(conn)
         self.grants = _Grants(conn)
         self.audit = _ConnectionAudit(conn)
+        self.lease_seconds = lease_seconds
 
     async def claim(self, key: str, tool: str, arguments: dict[str, Any], user_id: str) -> dict[str, Any] | None:
         await self._conn.execute(
@@ -135,13 +142,14 @@ class _ToolWorkspace:
 
 
 class PostgresToolUnitOfWork:
-    def __init__(self, pool: AsyncConnectionPool) -> None:
+    def __init__(self, pool: AsyncConnectionPool, lease_seconds: dict[str, int] | None = None) -> None:
         self._pool = pool
+        self._lease_seconds = lease_seconds or {"read": 30 * 86400, "write": 7 * 86400}
 
     @asynccontextmanager
     async def begin(self) -> AsyncIterator[_ToolWorkspace]:
         async with self._pool.connection() as conn, conn.transaction():
-            yield _ToolWorkspace(conn)
+            yield _ToolWorkspace(conn, self._lease_seconds)
 
 
 class PostgresApprovalStore:

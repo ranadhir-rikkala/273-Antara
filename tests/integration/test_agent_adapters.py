@@ -60,7 +60,7 @@ async def test_granting_access_marks_the_approved_request_granted(db) -> None:
     async with db.connection() as conn:
         await conn.execute("UPDATE approvals SET status = 'APPROVED' WHERE approval_id = %s", (approval_id,))
     async with PostgresToolUnitOfWork(db).begin() as workspace:
-        await workspace.grants.grant("run-3", "alice", "vpn", "user")
+        await workspace.grants.grant("run-3", "alice", "vpn", "user", 600)
     async with db.connection() as conn:
         status, escalated = await (
             await conn.execute("SELECT status, escalated FROM approvals WHERE approval_id = %s", (approval_id,))
@@ -135,3 +135,24 @@ async def test_expiring_only_touches_pending_approvals(db) -> None:
     async with db.connection() as conn:
         rows = dict(await (await conn.execute("SELECT run_id, status FROM approvals")).fetchall())
     assert rows == {"run-7": "EXPIRED", "run-8": "APPROVED"}
+
+
+async def test_a_grant_expires_after_its_lease_and_is_revoked_only_once(db) -> None:
+    async with PostgresToolUnitOfWork(db).begin() as workspace:
+        grant_id = await workspace.grants.grant("run-4", "alice", "prod-db", "read", 3600)
+    async with db.connection() as conn:
+        lease = await (
+            await conn.execute(
+                "SELECT extract(epoch FROM expires_at - granted_at)::int FROM access_grants WHERE grant_id = %s",
+                (grant_id,),
+            )
+        ).fetchone()
+    assert lease == (3600,)
+    async with PostgresToolUnitOfWork(db).begin() as workspace:
+        assert await workspace.grants.revoke(grant_id) is True
+        assert await workspace.grants.revoke(grant_id) is False
+    async with db.connection() as conn:
+        revoked = await (
+            await conn.execute("SELECT revoked_at IS NOT NULL FROM access_grants WHERE grant_id = %s", (grant_id,))
+        ).fetchone()
+    assert revoked == (True,)

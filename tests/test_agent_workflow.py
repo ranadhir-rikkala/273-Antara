@@ -1,13 +1,15 @@
 from datetime import timedelta
 
 from temporalio import activity
+from temporalio.client import WorkflowExecutionStatus
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from agent.triage import classify_by_rules
-from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
+from agent.workflows import AccessLeaseWorkflow, AgentRunWorkflow, IncidentReportWorkflow
 from common.models import (
+    AccessLease,
     AgentRunRequest,
     AgentRunState,
     ApprovalDecision,
@@ -43,6 +45,7 @@ incident_reports: list[str] = []
 cache: dict[str, CachedAnswer] = {}
 weak_retrieval: list[bool] = []
 retrievals: list[str] = []
+revocations: list[str] = []
 
 
 @activity.defn(name=Activities.CACHE_LOOKUP)
@@ -93,7 +96,14 @@ async def fake_execute_tool(request: ToolRequest) -> ToolResult:
     if failing_tools:
         raise ApplicationError("ticket system rejected the request", type="ToolError", non_retryable=True)
     executed.append(request.idempotency_key)
-    return ToolResult(request.idempotency_key, "COMPLETED", {"system": "prod-db", "role": "read", "status": "GRANTED"})
+    granted = {"grant_id": "grant-1", "system": "prod-db", "role": "read", "status": "GRANTED", "lease_seconds": 3600}
+    return ToolResult(request.idempotency_key, "COMPLETED", granted)
+
+
+@activity.defn(name=Activities.REVOKE_ACCESS)
+async def fake_revoke_access(grant_id: str) -> bool:
+    revocations.append(grant_id)
+    return True
 
 
 @activity.defn(name=Activities.OPEN_APPROVAL)
@@ -133,8 +143,9 @@ def _workers(env: WorkflowEnvironment) -> tuple[Worker, Worker]:
         Worker(
             env.client,
             task_queue=TOOLS,
-            workflows=[IncidentReportWorkflow],
+            workflows=[IncidentReportWorkflow, AccessLeaseWorkflow],
             activities=[
+                fake_revoke_access,
                 fake_execute_tool,
                 fake_open_approval,
                 fake_escalate_approval,
@@ -173,8 +184,37 @@ async def test_access_request_escalates_then_runs_tool_once_after_approval() -> 
             result = await handle.result()
     assert result.status == RunStatus.COMPLETED
     assert result.escalated is True
-    assert result.answer == "Your read access to prod-db was granted after manager-1 approved it."
+    assert result.answer == (
+        "Your read access to prod-db was granted after manager-1 approved it. It ends automatically in 1 hour."
+    )
     assert executed == ["agent-approve:0"]
+
+
+async def test_granted_access_starts_a_lease_that_outlives_the_run() -> None:
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            handle = await _run(env, "agent-lease", "I need access to prod-db")
+            await handle.signal(Signals.APPROVAL, ApprovalDecision(approved=True, approver_id="manager-1"))
+            assert (await handle.result()).status == RunStatus.COMPLETED
+            lease = await env.client.get_workflow_handle("lease-grant-1").describe()
+    assert lease.status == WorkflowExecutionStatus.RUNNING
+    assert lease.workflow_type == Workflows.ACCESS_LEASE
+
+
+async def test_a_lease_revokes_access_once_its_timer_fires() -> None:
+    revocations.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            started = await env.get_current_time()
+            outcome = await env.client.execute_workflow(
+                Workflows.ACCESS_LEASE, AccessLease("grant-9", 3600), id="lease-grant-9", task_queue=TOOLS
+            )
+            elapsed = await env.get_current_time() - started
+    assert outcome == "revoked"
+    assert revocations == ["grant-9"]
+    assert elapsed >= timedelta(hours=1)
 
 
 async def test_denied_access_request_never_runs_tool() -> None:

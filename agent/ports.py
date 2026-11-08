@@ -32,13 +32,16 @@ class TicketStore(Protocol):
 
 
 class AccessGrants(Protocol):
-    async def grant(self, run_id: str, requester_id: str, system: str, role: str) -> str: ...
+    async def grant(self, run_id: str, requester_id: str, system: str, role: str, lease_seconds: int) -> str: ...
+
+    async def revoke(self, grant_id: str) -> bool: ...
 
 
 class ToolWorkspace(Protocol):
     tickets: TicketStore
     grants: AccessGrants
     audit: AuditLog
+    lease_seconds: dict[str, int]
 
     async def claim(self, key: str, tool: str, arguments: dict[str, Any], user_id: str) -> dict[str, Any] | None: ...
 

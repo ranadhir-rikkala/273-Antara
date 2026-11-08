@@ -138,6 +138,12 @@ class ToolRequest:
 
 
 @dataclass
+class AccessLease:
+    grant_id: str
+    seconds: int
+
+
+@dataclass
 class ToolResult:
     idempotency_key: str
     status: str

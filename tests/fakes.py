@@ -86,9 +86,15 @@ class _Grants:
     def __init__(self, state: dict[str, Any]) -> None:
         self._state = state
 
-    async def grant(self, run_id: str, requester_id: str, system: str, role: str) -> str:
-        self._state["grants"].append((run_id, requester_id, system, role))
+    async def grant(self, run_id: str, requester_id: str, system: str, role: str, lease_seconds: int) -> str:
+        self._state["grants"].append((run_id, requester_id, system, role, lease_seconds))
         return f"grant-{len(self._state['grants'])}"
+
+    async def revoke(self, grant_id: str) -> bool:
+        if grant_id in self._state["revoked"]:
+            return False
+        self._state["revoked"].append(grant_id)
+        return True
 
 
 class _ToolWorkspace:
@@ -97,6 +103,7 @@ class _ToolWorkspace:
         self.tickets = _Tickets(state)
         self.grants = _Grants(state)
         self.audit = audit
+        self.lease_seconds = {"read": 30 * 86400, "write": 7 * 86400}
 
     async def claim(self, key: str, tool: str, arguments: dict[str, Any], user_id: str) -> dict[str, Any] | None:
         entry = self._state["ledger"].setdefault(key, {"status": "STARTED", "result": None})
@@ -108,7 +115,7 @@ class _ToolWorkspace:
 
 class FakeToolUnitOfWork:
     def __init__(self, crash_after_commit: bool = False) -> None:
-        self.state: dict[str, Any] = {"ledger": {}, "tickets": {}, "grants": []}
+        self.state: dict[str, Any] = {"ledger": {}, "tickets": {}, "grants": [], "revoked": []}
         self.audit = FakeAudit()
         self.crash_after_commit = crash_after_commit
 

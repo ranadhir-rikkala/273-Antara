@@ -1,3 +1,4 @@
+from psycopg_pool import AsyncConnectionPool
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -52,11 +53,20 @@ async def generate_answer(request: GenerateRequest) -> ModelTurn:
 @activity.defn(name=Activities.EXECUTE_TOOL)
 async def execute_tool(request: ToolRequest) -> ToolResult:
     try:
-        return await services.execute_tool(request, PostgresToolUnitOfWork(await pool()))
+        return await services.execute_tool(request, tool_unit_of_work(await pool()))
     except services.UnknownToolError as error:
         raise ApplicationError(str(error), type=Errors.UNKNOWN_TOOL, non_retryable=True) from error
     except services.PermissionDeniedError as error:
         raise ApplicationError(str(error), type=Errors.PERMISSION_DENIED, non_retryable=True) from error
+
+
+@activity.defn(name=Activities.REVOKE_ACCESS)
+async def revoke_access(grant_id: str) -> bool:
+    return await services.revoke_access(grant_id, tool_unit_of_work(await pool()))
+
+
+def tool_unit_of_work(db: AsyncConnectionPool) -> PostgresToolUnitOfWork:
+    return PostgresToolUnitOfWork(db, {"read": settings.access_read_seconds, "write": settings.access_write_seconds})
 
 
 @activity.defn(name=Activities.OPEN_APPROVAL)

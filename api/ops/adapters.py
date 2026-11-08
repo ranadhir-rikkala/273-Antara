@@ -139,7 +139,7 @@ class PostgresOpsStore:
                     "(SELECT count(*) FROM approvals WHERE status = 'PENDING' AND escalated), "
                     "(SELECT count(*) FROM incidents WHERE status = 'OPEN'), "
                     "(SELECT count(*) FROM tickets), "
-                    "(SELECT count(*) FROM access_grants)"
+                    "(SELECT count(*) FROM access_grants WHERE revoked_at IS NULL)"
                 )
             ).fetchone()
             documents = await (

@@ -3,10 +3,12 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ChildWorkflowError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from common.config import settings
     from common.models import (
+        AccessLease,
         AgentRunRequest,
         AgentRunState,
         ApprovalDecision,
@@ -28,7 +30,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from common.names import Activities, Queries, Signals, Workflows
     from common.queues import AGENT, TOOLS
-    from common.retry import DEFAULT_RETRY
+    from common.retry import DEFAULT_RETRY, PATIENT_RETRY
 
 with workflow.unsafe.imports_passed_through():
     from agent.memory import contextual_query, recent
@@ -173,6 +175,14 @@ class AgentRunWorkflow:
                 retry_policy=DEFAULT_RETRY,
             )
             self._state.tool_results.append(result)
+            if "lease_seconds" in result.output:
+                await workflow.start_child_workflow(
+                    Workflows.ACCESS_LEASE,
+                    AccessLease(grant_id=result.output["grant_id"], seconds=result.output["lease_seconds"]),
+                    id=f"lease-{result.output['grant_id']}",
+                    task_queue=TOOLS,
+                    parent_close_policy=ParentClosePolicy.ABANDON,
+                )
             self._state.answer = summarize_tool_result(turn.tool_call.name, result.output, self._approved_by)
             self._state.status = RunStatus.COMPLETED
             return self._state
@@ -263,3 +273,19 @@ class IncidentReportWorkflow:
             start_to_close_timeout=timedelta(minutes=1),
             retry_policy=DEFAULT_RETRY,
         )
+
+
+@workflow.defn(name=Workflows.ACCESS_LEASE)
+class AccessLeaseWorkflow:
+    @workflow.run
+    async def run(self, lease: AccessLease) -> str:
+        await workflow.sleep(timedelta(seconds=lease.seconds))
+        await workflow.execute_activity(
+            Activities.REVOKE_ACCESS,
+            lease.grant_id,
+            result_type=bool,
+            task_queue=TOOLS,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=PATIENT_RETRY,
+        )
+        return "revoked"

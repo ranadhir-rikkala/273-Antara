@@ -29,6 +29,9 @@ BOB = UserContext("bob", ["contractors"])
 VPN_CHUNK = ChunkResult("doc-vpn", "ver-vpn", "chunk-1", "Contractors request VPN access via the helpdesk.", 1, 0.8)
 
 
+DAY = 86400
+
+
 def tool_request(name: str, arguments: dict, user: UserContext = ALICE, key: str = "run-1:0") -> ToolRequest:
     return ToolRequest(idempotency_key=key, call=ToolCall(name, arguments), user=user, run_id="run-1")
 
@@ -131,13 +134,37 @@ async def test_ticket_status_is_only_visible_to_its_requester() -> None:
     assert theirs.output == {"found": False}
 
 
-async def test_access_is_granted_for_the_run() -> None:
+async def test_access_is_granted_for_the_run_with_a_lease_set_by_role() -> None:
     unit_of_work = FakeToolUnitOfWork()
-    result = await services.execute_tool(
+    read = await services.execute_tool(
         tool_request("request_access", {"system": "prod-db", "role": "read"}), unit_of_work
     )
-    assert result.output == {"grant_id": "grant-1", "system": "prod-db", "role": "read", "status": "GRANTED"}
-    assert unit_of_work.state["grants"] == [("run-1", "alice", "prod-db", "read")]
+    write = await services.execute_tool(
+        tool_request("request_access", {"system": "prod-db", "role": "write"}, key="run-1:1"), unit_of_work
+    )
+    other = await services.execute_tool(
+        tool_request("request_access", {"system": "wiki", "role": "admin"}, key="run-1:2"), unit_of_work
+    )
+    assert read.output == {
+        "grant_id": "grant-1",
+        "system": "prod-db",
+        "role": "read",
+        "status": "GRANTED",
+        "lease_seconds": 30 * DAY,
+    }
+    assert write.output["lease_seconds"] == 7 * DAY
+    assert other.output["lease_seconds"] == 7 * DAY
+    assert unit_of_work.state["grants"][0] == ("run-1", "alice", "prod-db", "read", 30 * DAY)
+
+
+async def test_access_is_revoked_once_and_the_revocation_is_audited() -> None:
+    unit_of_work = FakeToolUnitOfWork()
+    await services.execute_tool(tool_request("request_access", {"system": "prod-db", "role": "read"}), unit_of_work)
+    assert await services.revoke_access("grant-1", unit_of_work) is True
+    assert await services.revoke_access("grant-1", unit_of_work) is False
+    assert unit_of_work.state["revoked"] == ["grant-1"]
+    revocations = [entry for entry in unit_of_work.audit.entries if entry[1] == "access.revoked"]
+    assert revocations == [("system", "access.revoked", {"grant_id": "grant-1"})]
 
 
 async def test_opening_an_approval_twice_returns_the_same_id() -> None:

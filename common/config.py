@@ -53,6 +53,8 @@ class Settings(BaseSettings):
 
     incident_similarity: float = 0.82
     incident_window_minutes: int = 60
+    access_read_seconds: int = 30 * 86400
+    access_write_seconds: int = 7 * 86400
 
     cache_similarity: float = 0.95
     cache_ttl_hours: int = 24

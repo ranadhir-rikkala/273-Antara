@@ -4,6 +4,7 @@ class Workflows:
     RECONCILER = "ReconcilerWorkflow"
     DELETE_DOCUMENT = "DeleteDocumentWorkflow"
     INCIDENT_REPORT = "IncidentReportWorkflow"
+    ACCESS_LEASE = "AccessLeaseWorkflow"
 
 
 class Activities:
@@ -25,6 +26,7 @@ class Activities:
     CACHE_LOOKUP = "lookup_cached_answer"
     CACHE_STORE = "store_cached_answer"
     FIND_INCONSISTENT = "find_inconsistent_versions"
+    REVOKE_ACCESS = "revoke_access"
 
 
 class Signals:
