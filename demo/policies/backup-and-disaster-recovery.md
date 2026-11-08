@@ -6,7 +6,9 @@ If a customer-facing database is lost, we lose at most 15 minutes of data (the R
 
 Internal tools are less critical: they can lose up to 24 hours of data and must be running again within 2 business days.
 
-Databases are backed up every 15 minutes to the primary backup vault in the us-west region, and a full copy is replicated nightly to the disaster recovery site in us-east.
+The disaster recovery site is in the us-east region. Every night, a full copy of all backups is replicated to the disaster recovery site in us-east.
+
+Databases are backed up every 15 minutes to the primary backup vault in the us-west region.
 
 Backups are kept for 35 days. Monthly snapshots are kept for 1 year for audit.
 

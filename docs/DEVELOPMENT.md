@@ -87,6 +87,7 @@ Read [AGENTS.md](../AGENTS.md) first: services hold the rules, adapters hold the
 | `scripts/check.sh` | Lint, format, unit and workflow tests, 100% coverage of business logic | Docker |
 | `scripts/integration.sh` | Every Postgres adapter against a real pgvector database | Docker |
 | `python -m evals.run` | Model behaviour: right answers, right citations, no leaks, no invented confirmations | A running stack with models |
+| `python -m evals.run --cases evals/demo.json` | The 46 questions most likely in the live demo, across every user and harness layer. Run it before every demo | A running stack with the demo documents |
 
 The eval suite must stay at 100%. When you find a new hallucination, add a case to `evals/cases.json` that reproduces it, watch it fail, then fix the harness.
 

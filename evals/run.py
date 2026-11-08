@@ -116,9 +116,10 @@ def main() -> None:
     parser.add_argument("--min-pass-rate", type=float, default=1.0)
     parser.add_argument("--timeout", type=float, default=240)
     parser.add_argument("--only", nargs="*")
+    parser.add_argument("--cases", type=Path, default=CASES)
     args = parser.parse_args()
 
-    cases = [case for case in json.loads(CASES.read_text()) if not args.only or case["id"] in args.only]
+    cases = [case for case in json.loads(args.cases.read_text()) if not args.only or case["id"] in args.only]
     outcomes: list[Outcome] = []
     with httpx.Client(base_url=args.api, timeout=30) as client:
         fixture_ids = upload_fixtures(client)
