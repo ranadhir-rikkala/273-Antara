@@ -27,7 +27,7 @@
   .muted { color: var(--muted); }
 
   .top { background: var(--panel); border-bottom: 1px solid var(--line); }
-  .top-inner { max-width: 1400px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .top-inner { max-width: 1440px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
   .brand svg { color: var(--vault); flex: none; }
   .brand b { font-size: 15px; }
@@ -39,7 +39,7 @@
   select { appearance: none; border: 1px solid var(--line); background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23767a72' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
            border-radius: 4px; padding: 5px 28px 5px 9px; cursor: pointer; font-size: 12.5px; }
 
-  main { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; }
+  main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 40px; }
   @media (max-width: 1000px) { main { padding: 14px; } .top-inner { padding: 10px 14px; } }
   #denied { padding: 10px 12px; background: var(--brick-tint); color: var(--brick); border-radius: 4px; margin-bottom: 16px; }
 
@@ -61,11 +61,12 @@
   .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
   .panel-head h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
   .panel-head small { font-size: 12px; color: var(--muted); }
+  .mod { font: 600 10px/1 var(--mono); letter-spacing: .04em; color: var(--vault); background: var(--vault-tint); padding: 3px 5px; border-radius: 2px; white-space: nowrap; }
 
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; font-size: 11.5px; font-weight: 500; color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  td { padding: 10px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
   tr:last-child td { border-bottom: 0; }
   th:first-child, td:first-child { padding-left: 16px; }
   th:last-child, td:last-child { padding-right: 16px; }
@@ -78,15 +79,29 @@
   .pod.starting { background: var(--amber); }
   .pod.terminating { background: var(--brick); }
   .pods b { font-weight: 500; font-family: var(--mono); font-size: 12px; margin-left: 6px; }
+  .scale { font-size: 12px; color: var(--soft); white-space: nowrap; }
+  .scale.up { color: var(--vault); font-weight: 600; }
   .warn-text { color: var(--amber); font-weight: 600; }
   .zero { color: var(--muted); }
   .platform { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--line); font-size: 12.5px; }
   .platform .tag { color: var(--muted); }
 
+  .mechanisms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 1250px) { .mechanisms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 620px) { .mechanisms { grid-template-columns: minmax(0, 1fr); } }
+  .mech { padding: 12px 16px 14px; border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); min-width: 0; }
+  .mech-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .mech-head b { font-size: 12.5px; }
+  .mech .value { font-size: 17px; font-weight: 600; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .mech.active .value { color: var(--vault); }
+  .mech.alert .value { color: var(--amber); }
+  .mech p { margin: 0; font-size: 12px; color: var(--muted); }
+
   .action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--hair); }
   .action:last-child { border-bottom: 0; }
   .action b { font-weight: 600; }
   .action p { margin: 0; grid-column: 1; font-size: 12px; color: var(--muted); }
+  .action p .mod { margin-right: 6px; }
   .action button { grid-row: 1 / span 2; grid-column: 2; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
   .action button.danger { color: var(--brick); border-color: var(--brick); }
   .action button:hover { background: var(--paper); }
@@ -94,6 +109,13 @@
   .notice { font-size: 12.5px; padding: 9px 16px; border-top: 1px solid var(--hair); color: var(--soft); }
   .notice.error { color: var(--brick); }
   .notice:empty { display: none; }
+
+  .tools a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 16px; border-bottom: 1px solid var(--hair); color: inherit; text-decoration: none; }
+  .tools a:last-child { border-bottom: 0; }
+  .tools a:hover { background: var(--paper); }
+  .tools b { font-weight: 600; color: var(--vault); }
+  .tools p { margin: 0; grid-column: 1; font-size: 12px; color: var(--muted); }
+  .tools .arrow { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--muted); }
 
   .timeline { max-height: 330px; overflow-y: auto; }
   .event { display: grid; grid-template-columns: 62px 8px minmax(0, 1fr); gap: 10px; padding: 7px 16px; border-bottom: 1px solid var(--hair); align-items: baseline; font-size: 12.5px; }
@@ -128,29 +150,42 @@
   <div class="grid">
     <div>
       <section class="panel">
-        <div class="panel-head"><h2>Services</h2><small>Workers pull tasks from their queue. KEDA adds pods when a queue backs up.</small></div>
+        <div class="panel-head"><h2>Services</h2><small>Workers pull tasks from their own Temporal queue. KEDA scales each one on its backlog.</small></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Service</th><th>Pods</th><th class="n">Queued tasks</th><th class="n">Tasks / s</th></tr></thead>
+            <thead><tr><th>Service</th><th>Pods</th><th>Scaling</th><th class="n">Queued</th><th class="n">Tasks / s</th><th class="n">Restarts</th></tr></thead>
             <tbody id="services"></tbody>
           </table>
         </div>
         <div class="platform" id="platform"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Distributed-systems mechanisms</h2><small>Live evidence for each mechanism · tags are course modules</small></div>
+        <div class="mechanisms" id="mechanisms"></div>
       </section>
     </div>
     <div>
       <section class="panel">
         <div class="panel-head"><h2>Failure drills</h2><small id="chaos-state"></small></div>
         <div id="chaos">
-          <div class="action"><b>Kill an agent worker</b><p>The question in progress finishes on another pod.</p><button class="danger" data-action="kill" data-target="agent">Run</button></div>
-          <div class="action"><b>Kill an ingest worker</b><p>Documents wait in the queue; none are lost.</p><button class="danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
-          <div class="action"><b>Take the model down for 30 s</b><p>Calls retry with backoff, then succeed.</p><button class="danger" data-action="outage">Run</button></div>
-          <div class="action"><b id="gpu-title">Take the GPU lane down</b><p>New documents embed on CPU after 20 s.</p><button class="danger" data-action="gpu">Run</button></div>
-          <div class="action"><b>Flood with traffic</b><p>200 uploads and 50 questions. Pods scale out; overload is refused with 429.</p><button class="danger" data-action="flood">Run</button></div>
-          <div class="action"><b>Corrupt a document's index</b><p>The reconciler detects and repairs it within about 30 s.</p><button class="danger" data-action="corrupt">Run</button></div>
-          <div class="action"><b>Run the reconciler now</b><p>Checks every document and repairs any that are stuck.</p><button data-action="reconcile">Run</button></div>
+          <div class="action"><b>Kill an agent worker</b><p><span class="mod">M7</span>The question in progress finishes on another pod.</p><button class="danger" data-action="kill" data-target="agent">Run</button></div>
+          <div class="action"><b>Kill an ingest worker</b><p><span class="mod">M5</span>Documents wait in the queue; none are lost.</p><button class="danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
+          <div class="action"><b>Take the model down for 30 s</b><p><span class="mod">M3</span>Calls retry with backoff, then succeed.</p><button class="danger" data-action="outage">Run</button></div>
+          <div class="action"><b id="gpu-title">Take the GPU lane down</b><p><span class="mod">M6</span>New documents embed on CPU after 20 s.</p><button class="danger" data-action="gpu">Run</button></div>
+          <div class="action"><b>Flood with traffic</b><p><span class="mod">M6</span>200 uploads, 50 questions: pods scale out, overload gets 429.</p><button class="danger" data-action="flood">Run</button></div>
+          <div class="action"><b>Corrupt a document's index</b><p><span class="mod">M8</span>The reconciler detects and repairs it within about 30 s.</p><button class="danger" data-action="corrupt">Run</button></div>
+          <div class="action"><b>Run the reconciler now</b><p><span class="mod">M4</span>Checks every document and repairs any that are stuck.</p><button data-action="reconcile">Run</button></div>
         </div>
         <div id="notice" class="notice"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Observability</h2><small>Metrics, traces and workflow history, all in-cluster</small></div>
+        <div class="tools">
+          <a href="/grafana/d/antara-overview?refresh=5s" target="_blank" rel="noopener"><b>Grafana dashboard</b><p>Queue backlog, 429s by reason, model latency p95</p><span class="arrow">↗</span></a>
+          <a href="/jaeger/search?service=api" target="_blank" rel="noopener"><b>Jaeger traces</b><p>One request followed across API, Temporal, workers and model</p><span class="arrow">↗</span></a>
+          <a href="/temporal/namespaces/default/workflows?query=WorkflowType%20!%3D%20%22ReconcilerWorkflow%22" target="_blank" rel="noopener"><b>Temporal workflow history</b><p>Every durable run: retries, timers, signals, which pod ran each step</p><span class="arrow">↗</span></a>
+          <a href="/prometheus/graph?g0.expr=sum%20by%20(reason)%20(antara_api_rejected_total)&amp;g0.tab=0" target="_blank" rel="noopener"><b>Prometheus</b><p>Raw metrics scraped from every pod</p><span class="arrow">↗</span></a>
+        </div>
       </section>
       <section class="panel">
         <div class="panel-head"><h2>Activity</h2><small>Red: failure injected · Green: recovered</small></div>
@@ -170,15 +205,17 @@ const timeline = [];
 let previous = null;
 let gpuDown = false;
 let lastOk = 0;
+const pendingKills = new Map();
+let lastRecovery = null;
 
 const SERVICES = [
-  { app: "api", role: "Web API · admits or refuses requests (429)" },
-  { app: "gateway", role: "Model gateway · caps concurrent model calls" },
-  { app: "agent", role: "Answers questions", queue: "agent" },
-  { app: "tools", role: "Tickets, access grants and approvals", queue: "tools" },
-  { app: "ingest-cpu", role: "Reads and indexes documents", queue: "ingest-cpu" },
-  { app: "ingest-gpu", role: "Embeds documents on the GPU lane", queue: "ingest-gpu" },
-  { app: "reconciler", role: "Finds and repairs broken documents", queue: "reconciler" },
+  { app: "api", role: "Web API · admits or refuses requests (429)", scale: "fixed 2" },
+  { app: "gateway", role: "Model gateway · caps concurrent model calls", scale: "fixed 1" },
+  { app: "agent", role: "Answers questions", queue: "agent", max: 3 },
+  { app: "tools", role: "Tickets, access grants, approvals, leases", queue: "tools", max: 3 },
+  { app: "ingest-cpu", role: "Reads and indexes documents", queue: "ingest-cpu", max: 4 },
+  { app: "ingest-gpu", role: "Embeds documents on the GPU lane", queue: "ingest-gpu", max: 2 },
+  { app: "reconciler", role: "Finds and repairs broken documents", queue: "reconciler", scale: "fixed 1" },
 ];
 const SERVICE_APPS = new Set(SERVICES.map((service) => service.app));
 
@@ -211,6 +248,11 @@ function clock(date = new Date()) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
+function ago(date) {
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  return seconds < 90 ? `${seconds} s ago` : `${Math.round(seconds / 60)} min ago`;
+}
+
 function note(kind, text, at = new Date()) {
   timeline.unshift({ kind, text, at });
   timeline.splice(60);
@@ -233,6 +275,11 @@ const EVENT_TEXT = {
 };
 
 const seenEvents = new Set();
+let firstLoad = true;
+
+function appOf(podName) {
+  return SERVICES.map((service) => service.app).sort((a, b) => b.length - a.length).find((app) => podName.startsWith(`${app}-`));
+}
 
 function absorb(state) {
   for (const event of [...state.events].reverse()) {
@@ -242,14 +289,29 @@ function absorb(state) {
     const describe = EVENT_TEXT[event.kind] || (() => [event.kind, "info"]);
     const [text, kind] = describe(event.detail || {});
     note(kind, `${text} · ${event.actor}`, new Date(event.at));
+    if (event.kind === "chaos.kill-worker" && !firstLoad && appOf(event.detail.pod || "")) {
+      pendingKills.set(appOf(event.detail.pod), { pod: event.detail.pod, at: new Date(event.at) });
+    }
   }
+  firstLoad = false;
   if (!previous) return;
   const before = new Map(previous.pods.map((pod) => [pod.name, pod]));
   const now = new Map(state.pods.map((pod) => [pod.name, pod]));
   for (const [name, pod] of now) {
     const old = before.get(name);
-    if (!old) note("info", `${pod.app}: new pod started`);
-    else if (!old.ready && pod.ready && !pod.terminating) note("heal", `${pod.app}: pod ready`);
+    const becameReady = pod.ready && !pod.terminating && (!old || !old.ready);
+    if (!old) note("info", `${pod.app}: new pod scheduled`);
+    if (becameReady) {
+      const kill = pendingKills.get(pod.app);
+      if (kill && name !== kill.pod) {
+        const seconds = Math.round((Date.now() - kill.at.getTime()) / 1000);
+        lastRecovery = { app: pod.app, seconds };
+        pendingKills.delete(pod.app);
+        note("heal", `${pod.app}: replacement pod ready ${seconds} s after the kill`);
+      } else if (old) {
+        note("heal", `${pod.app}: pod ready`);
+      }
+    }
   }
   for (const [name, pod] of before) if (!now.has(name)) note("info", `${pod.app}: pod removed`);
   if (!previous.model.chaos && state.model.chaos) note("chaos", "Model gateway failing requests");
@@ -263,11 +325,28 @@ function stat(name, value, hint, tone = "", dot = false) {
   return el("div", { class: `stat ${tone}` }, el("div", { class: "name" }, name), valueNode, el("div", { class: "hint" }, hint));
 }
 
+function mechanism(title, modules, value, how, tone = "") {
+  return el("div", { class: `mech ${tone}` },
+    el("div", { class: "mech-head" }, el("b", {}, title), el("span", { class: "mod" }, modules)),
+    el("div", { class: "value" }, value),
+    el("p", {}, how));
+}
+
 function render(state) {
   const s = state.summary;
   const apiRefused = Math.round(state.metrics.rejected_429 ?? 0);
   const modelRefused = Math.round(state.metrics.model_busy_429 ?? 0);
   const modelDown = state.model.chaos || !state.model.ok;
+  const podsByApp = new Map();
+  for (const pod of state.pods) {
+    if (!podsByApp.has(pod.app)) podsByApp.set(pod.app, []);
+    podsByApp.get(pod.app).push(pod);
+  }
+  const readyCount = (app) => (podsByApp.get(app) || []).filter((pod) => pod.ready && !pod.terminating).length;
+  const queues = new Map(state.queues.map((queue) => [queue.name, queue]));
+  const rates = state.metrics.activities_per_second || {};
+  const restarts = state.pods.reduce((sum, pod) => sum + (pod.restarts || 0), 0);
+
   $("health").replaceChildren(
     stat("Pods ready", `${s.pods_ready} / ${s.pods_total}`, "across all services", s.pods_ready < s.pods_total ? "warn" : ""),
     stat("Queued tasks", s.backlog, "waiting for a worker", s.backlog > 20 ? "warn" : ""),
@@ -276,32 +355,29 @@ function render(state) {
     stat("Model", modelDown ? "Down" : "Healthy", state.model.chaos ? "failure drill running" : "served inside the cluster", modelDown ? "bad" : "", true),
   );
 
-  const podsByApp = new Map();
-  for (const pod of state.pods) {
-    if (!podsByApp.has(pod.app)) podsByApp.set(pod.app, []);
-    podsByApp.get(pod.app).push(pod);
-  }
-  const queues = new Map(state.queues.map((queue) => [queue.name, queue]));
-  const rates = state.metrics.activities_per_second || {};
   $("services").replaceChildren(...SERVICES.map((service) => {
     const pods = podsByApp.get(service.app) || [];
-    const ready = pods.filter((pod) => pod.ready && !pod.terminating).length;
+    const ready = readyCount(service.app);
     const queue = service.queue ? queues.get(service.queue) : null;
     const backlog = queue && !queue.error ? queue.backlog : null;
     const rate = pods.reduce((sum, pod) => sum + (rates[pod.name] || 0), 0);
+    const podRestarts = pods.reduce((sum, pod) => sum + (pod.restarts || 0), 0);
+    const scaled = service.max && pods.length > 1;
     return el("tr", {},
       el("td", {}, el("div", { class: "svc" }, service.app), el("div", { class: "role" }, service.role)),
       el("td", {}, el("div", { class: "pods" },
         ...pods.map((pod) => el("span", {
           class: `pod ${pod.terminating ? "terminating" : pod.ready ? "" : "starting"}`,
-          title: `${pod.name} · ${pod.terminating ? "stopping" : pod.ready ? "ready" : "starting"}`,
+          title: `${pod.name} · ${pod.terminating ? "stopping" : pod.ready ? "ready" : "starting"} · ${pod.restarts} restarts`,
         })),
         el("b", {}, `${ready}/${pods.length}`))),
-      el("td", { class: `n ${backlog > 20 ? "warn-text" : backlog ? "" : "zero"}` }, backlog === null ? (queue ? "?" : "—") : backlog),
+      el("td", {}, el("span", { class: `scale ${scaled ? "up" : ""}` }, service.max ? `KEDA 1 → ${service.max}` : service.scale)),
+      el("td", { class: `n ${backlog > 20 ? "warn-text" : backlog ? "" : "zero"}` }, backlog === null ? "—" : backlog),
       el("td", { class: `n ${rate >= 0.01 ? "" : "zero"}` }, service.queue ? rate.toFixed(2) : "—"),
+      el("td", { class: `n ${podRestarts ? "" : "zero"}` }, podRestarts),
     );
   }));
-  if (state.errors.pods) $("services").replaceChildren(el("tr", {}, el("td", { colspan: "4", class: "muted" }, `Pods unavailable: ${state.errors.pods}`)));
+  if (state.errors.pods) $("services").replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "muted" }, `Pods unavailable: ${state.errors.pods}`)));
 
   const platform = state.pods.filter((pod) => !SERVICE_APPS.has(pod.app));
   const platformReady = platform.filter((pod) => pod.ready && !pod.terminating).length;
@@ -309,6 +385,40 @@ function render(state) {
     el("b", {}, "Platform"),
     el("span", { class: platformReady === platform.length ? "" : "warn-text" }, `${platformReady}/${platform.length} ready`),
     el("span", { class: "tag" }, [...new Set(platform.map((pod) => pod.app))].sort().join(" · ")),
+  );
+
+  const busyPods = Object.values(rates).filter((rate) => rate >= 0.01).length;
+  const docs = state.counts.documents || {};
+  const reconcilerRuns = state.workflows.filter((workflow) => workflow.type === "ReconcilerWorkflow" && workflow.started);
+  const lastReconcile = reconcilerRuns.length ? new Date(Math.max(...reconcilerRuns.map((run) => new Date(run.started).getTime()))) : null;
+  const reports = state.incidents.reduce((sum, incident) => sum + incident.reporters, 0);
+  const gpuReady = readyCount("ingest-gpu");
+  const scaledOut = SERVICES.filter((service) => service.max && (podsByApp.get(service.app) || []).length > 1).length;
+  $("mechanisms").replaceChildren(
+    mechanism("Asynchronous messaging", "M5", `${s.backlog} queued · 5 queues`,
+      "The API hands work to Temporal task queues and returns 202; workers process it later.", s.backlog ? "active" : ""),
+    mechanism("Independent scaling", "M6", SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),
+      "KEDA scales each worker type on its own queue backlog.", scaledOut ? "active" : ""),
+    mechanism("Load balancing", "M6", `${readyCount("api")} API replicas · ${busyPods} busy pod${busyPods === 1 ? "" : "s"}`,
+      "Workers pull tasks, so whichever pod is free takes the next one.", busyPods > 1 ? "active" : ""),
+    mechanism("Backpressure", "M4 · M6", `${apiRefused} API · ${modelRefused} model`,
+      "Overload is refused with 429 and Retry-After instead of queueing without limit.", apiRefused || modelRefused ? "alert" : ""),
+    mechanism("Retries with backoff", "M3 · M6", "chat ×6 · embedding ≤ 30 min",
+      "Backoff doubles from 2 s to 30 s. Corrupt files and permission errors are never retried."),
+    mechanism("Failure recovery", "M1 · M7", lastRecovery ? `${lastRecovery.app} back in ${lastRecovery.seconds} s` : `${restarts} restarts survived`,
+      "Durable workflows resume on another pod; heartbeats detect a dead worker in 30 s.", lastRecovery ? "active" : ""),
+    mechanism("Reliable messaging", "M5 · M9", `${state.counts.approvals_pending} awaiting approval · ${state.counts.approvals_escalated} escalated`,
+      "Approval signals wait durably in Temporal and survive worker restarts.", state.counts.approvals_pending ? "active" : ""),
+    mechanism("State reconciliation", "M4 · M8", lastReconcile ? `ran ${ago(lastReconcile)} · ${docs.PROCESSING || 0} stuck` : `${docs.PROCESSING || 0} stuck`,
+      "Every 30 s the reconciler re-runs stuck documents and rebuilds missing vectors."),
+    mechanism("Capability-aware scheduling", "M6", gpuReady ? `GPU lane up · ${queues.get("ingest-gpu")?.backlog ?? 0} queued` : "GPU lane down → CPU",
+      "Embeddings prefer the GPU lane; work not picked up in 20 s falls back to CPU.", gpuReady ? "" : "alert"),
+    mechanism("Effectively-once tools", "M5 · M9", `${state.counts.tickets} tickets · ${state.counts.access_grants} active grants`,
+      "Each tool call carries an idempotency key; a replay returns the stored result."),
+    mechanism("Saga with compensation", "M7 · M9", `${state.counts.leases_active ?? 0} lease${state.counts.leases_active === 1 ? "" : "s"} running`,
+      "Granted access is a lease; a durable timer runs the compensating revoke when it ends.", state.counts.leases_active ? "active" : ""),
+    mechanism("Fan-out / fan-in", "M5", `${reports} reports → ${state.incidents.length} incidents`,
+      "Duplicate outage reports merge into one incident per affected system.", reports > state.incidents.length ? "active" : ""),
   );
 
   $("incidents").replaceChildren(...(state.incidents.length ? state.incidents.map((incident) =>
@@ -345,14 +455,14 @@ async function refresh() {
 }
 
 const ACTIONS = {
-  kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Killed ${r.killed}. A replacement pod starts in the Services table.`),
-  outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "The model fails every call for the next 30 seconds."),
+  kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Killed ${r.killed}. The console times how long the replacement takes.`),
+  outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "The model fails every call for the next 30 seconds. Ask a question in the helpdesk now."),
   gpu: () => call("/ops/chaos/gpu-lane", { down: !gpuDown }).then((r) => {
     gpuDown = r.gpu_lane_down;
     $("gpu-title").textContent = gpuDown ? "Restore the GPU lane" : "Take the GPU lane down";
     return gpuDown ? "GPU lane is down. Upload a document to watch it fall back to CPU." : "GPU lane restored.";
   }),
-  flood: () => call("/ops/chaos/flood", { documents: 200, questions: 50 }).then(() => "Flood running. Watch queued tasks, pods and the 429 counts."),
+  flood: () => call("/ops/chaos/flood", { documents: 200, questions: 50 }).then(() => "Flood running. Watch queued tasks, pods scaling and the 429 counts."),
   corrupt: () => call("/ops/chaos/corrupt-index", {}).then((r) => `Corrupted ${r.title}. The reconciler repairs it within about 30 seconds.`),
   reconcile: () => call("/ops/reconcile", {}).then(() => "Reconciler started."),
 };

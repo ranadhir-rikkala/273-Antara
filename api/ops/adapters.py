@@ -139,7 +139,8 @@ class PostgresOpsStore:
                     "(SELECT count(*) FROM approvals WHERE status = 'PENDING' AND escalated), "
                     "(SELECT count(*) FROM incidents WHERE status = 'OPEN'), "
                     "(SELECT count(*) FROM tickets), "
-                    "(SELECT count(*) FROM access_grants WHERE revoked_at IS NULL)"
+                    "(SELECT count(*) FROM access_grants WHERE revoked_at IS NULL), "
+                    "(SELECT count(*) FROM access_grants WHERE revoked_at IS NULL AND expires_at IS NOT NULL)"
                 )
             ).fetchone()
             documents = await (
@@ -148,7 +149,14 @@ class PostgresOpsStore:
                     "ON v.document_id = d.document_id WHERE d.deleted_at IS NULL GROUP BY v.status"
                 )
             ).fetchall()
-        keys = ("approvals_pending", "approvals_escalated", "incidents_open", "tickets", "access_grants")
+        keys = (
+            "approvals_pending",
+            "approvals_escalated",
+            "incidents_open",
+            "tickets",
+            "access_grants",
+            "leases_active",
+        )
         return {**dict(zip(keys, row, strict=True)), "documents": dict(documents)}
 
     async def open_incidents(self, limit: int) -> list[dict[str, Any]]:

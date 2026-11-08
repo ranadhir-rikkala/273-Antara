@@ -30,3 +30,15 @@ async def test_counts_incidents_and_events(db) -> None:
     assert counts["documents"] == {"READY": 1} and counts["approvals_pending"] == 0
     assert (await store.events(5))[0]["kind"] == "chaos.kill-worker"
     assert await store.open_incidents(5) == []
+
+
+async def test_counts_only_unrevoked_grants_and_the_leases_among_them(db) -> None:
+    async with db.connection() as conn:
+        await conn.execute(
+            "INSERT INTO access_grants (run_id, requester_id, system, role, expires_at, revoked_at) VALUES "
+            "('r1', 'alice', 'wiki', 'read', NULL, NULL), "
+            "('r2', 'alice', 'prod-db', 'read', now() + interval '1 hour', NULL), "
+            "('r3', 'alice', 'prod-db', 'write', now() - interval '1 hour', now())"
+        )
+    counts = await PostgresOpsStore(db).counts()
+    assert (counts["access_grants"], counts["leases_active"]) == (2, 1)

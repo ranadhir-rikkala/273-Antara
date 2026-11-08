@@ -59,4 +59,5 @@ spec:
           image: temporalio/ui:2.31.2
           env:
             - {name: TEMPORAL_ADDRESS, value: temporal-frontend:7233}
+            - {name: TEMPORAL_UI_PUBLIC_PATH, value: /temporal}
           ports: [{containerPort: 8080}]
