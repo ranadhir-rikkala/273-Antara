@@ -1,8 +1,3 @@
-import io
-
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
-
 from common.models import (
     ChunkedDocument,
     ChunkResult,
@@ -21,6 +16,7 @@ from ingest.ports import (
     DocumentLifecycle,
     Embedder,
     ObjectStore,
+    PdfPages,
     PublishUnitOfWork,
     QueueInspector,
     SearchIndex,
@@ -41,13 +37,9 @@ class IncompleteVersionError(Exception):
     pass
 
 
-def extract_text(data: bytes, content_type: str) -> str:
+def extract_text(data: bytes, content_type: str, pdf: PdfPages) -> str:
     if content_type == "application/pdf":
-        try:
-            reader = PdfReader(io.BytesIO(data))
-            return PAGE_BREAK.join(page.extract_text() or "" for page in reader.pages)
-        except PdfReadError as error:
-            raise CorruptDocumentError(str(error)) from error
+        return PAGE_BREAK.join(pdf.pages(data))
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError as error:
@@ -73,9 +65,11 @@ def object_prefixes(document_id: str) -> list[str]:
     return [f"originals/{document_id}/", f"text/{document_id}/"]
 
 
-async def extract(request: IngestRequest, objects: ObjectStore, versions: VersionStore) -> ExtractedDocument:
+async def extract(
+    request: IngestRequest, objects: ObjectStore, versions: VersionStore, pdf: PdfPages
+) -> ExtractedDocument:
     await versions.set_status(request.version_id, VersionStatus.PROCESSING)
-    text = extract_text(await objects.get(request.object_key), request.content_type)
+    text = extract_text(await objects.get(request.object_key), request.content_type, pdf)
     text_key = text_key_for(request.document_id, request.version_id)
     await objects.put(text_key, text.encode("utf-8"), "text/plain")
     await versions.set_text_key(request.version_id, text_key)

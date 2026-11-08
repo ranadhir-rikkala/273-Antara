@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from common.models import CachedAnswer, ChunkResult, IncidentResult, IngestRequest, QueueStats, ToolCall
+from ingest.services import CorruptDocumentError
 
 VOCABULARY = ("vpn", "down", "password", "laptop", "access", "database", "printer", "salary")
 
@@ -413,3 +414,13 @@ class FakeInbox:
     @asynccontextmanager
     async def begin(self) -> AsyncIterator[_DecisionWorkspace]:
         yield _DecisionWorkspace(self)
+
+
+class FakePdfPages:
+    def __init__(self, documents: dict[bytes, list[str]]) -> None:
+        self._documents = documents
+
+    def pages(self, data: bytes) -> list[str]:
+        if data not in self._documents:
+            raise CorruptDocumentError("not a PDF")
+        return self._documents[data]

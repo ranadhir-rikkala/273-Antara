@@ -20,6 +20,7 @@ LOGIC = [
     "api/ops/services.py",
     "ingest/ports.py",
     "ingest/dispatch.py",
+    "ingest/services.py",
     "reconciler/ports.py",
     "reconciler/services.py",
 ]

@@ -17,6 +17,7 @@ from common.queue_stats import TemporalQueueInspector
 from common.storage import S3ObjectStore
 from common.temporal_client import shared
 from ingest import services
+from ingest.pdf import PypdfPages
 from ingest.postgres import (
     PostgresChunkStore,
     PostgresDocumentLifecycle,
@@ -28,7 +29,7 @@ from ingest.postgres import (
 @activity.defn(name=Activities.EXTRACT)
 async def extract_document(request: IngestRequest) -> ExtractedDocument:
     try:
-        return await services.extract(request, S3ObjectStore(), PostgresVersionStore(await pool()))
+        return await services.extract(request, S3ObjectStore(), PostgresVersionStore(await pool()), PypdfPages())
     except services.CorruptDocumentError as error:
         raise ApplicationError(str(error), type=Errors.CORRUPT_DOCUMENT, non_retryable=True) from error
 

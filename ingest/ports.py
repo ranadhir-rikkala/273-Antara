@@ -13,6 +13,10 @@ class ObjectStore(Protocol):
     async def delete_prefix(self, prefix: str) -> int: ...
 
 
+class PdfPages(Protocol):
+    def pages(self, data: bytes) -> list[str]: ...
+
+
 class Embedder(Protocol):
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
 

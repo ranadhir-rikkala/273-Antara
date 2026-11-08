@@ -1,7 +1,4 @@
-import io
-
 import pytest
-from pypdf import PdfWriter
 
 from common.models import (
     ChunkResult,
@@ -20,6 +17,7 @@ from tests.fakes import (
     FakeLifecycle,
     FakeModel,
     FakeObjectStore,
+    FakePdfPages,
     FakePublishUnitOfWork,
     FakeQueueInspector,
     FakeSearchIndex,
@@ -29,21 +27,14 @@ from tests.fakes import (
 REQUEST = IngestRequest("doc-1", "ver-1", "originals/doc-1/ver-1/policy.txt", "text/plain")
 
 
-def blank_pdf() -> bytes:
-    writer = PdfWriter()
-    writer.add_blank_page(width=200, height=200)
-    buffer = io.BytesIO()
-    writer.write(buffer)
-    return buffer.getvalue()
-
-
 def test_text_and_pdf_are_extracted_and_garbage_is_rejected() -> None:
-    assert services.extract_text(b"VPN policy", "text/plain") == "VPN policy"
-    assert services.extract_text(blank_pdf(), "application/pdf") == ""
+    pdf = FakePdfPages({b"%PDF two pages": ["VPN", "MFA"]})
+    assert services.extract_text(b"VPN policy", "text/plain", pdf) == "VPN policy"
+    assert services.extract_text(b"%PDF two pages", "application/pdf", pdf) == "VPN\fMFA"
     with pytest.raises(services.CorruptDocumentError):
-        services.extract_text(b"\xff\xfe\xfa", "text/plain")
+        services.extract_text(b"\xff\xfe\xfa", "text/plain", pdf)
     with pytest.raises(services.CorruptDocumentError):
-        services.extract_text(b"not a pdf", "application/pdf")
+        services.extract_text(b"not a pdf", "application/pdf", pdf)
 
 
 def test_pages_split_into_overlapping_chunks_with_page_numbers() -> None:
@@ -55,7 +46,7 @@ def test_pages_split_into_overlapping_chunks_with_page_numbers() -> None:
 
 async def test_extract_stores_text_and_marks_the_version_processing() -> None:
     objects, versions = FakeObjectStore({REQUEST.object_key: b"VPN needs MFA"}), FakeVersionStore()
-    extracted = await services.extract(REQUEST, objects, versions)
+    extracted = await services.extract(REQUEST, objects, versions, FakePdfPages({}))
     assert extracted.text_key == "text/doc-1/ver-1.txt"
     assert objects.objects["text/doc-1/ver-1.txt"] == b"VPN needs MFA"
     assert versions.status["ver-1"] == (VersionStatus.PROCESSING, None)
