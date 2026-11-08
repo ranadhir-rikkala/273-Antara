@@ -43,6 +43,7 @@ class IngestWorkflow:
                 schedule_to_start_timeout=GPU_PICKUP_TIMEOUT if queue == INGEST_GPU else None,
                 schedule_to_close_timeout=PATIENT_DEADLINE,
                 start_to_close_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(seconds=30),
                 retry_policy=PATIENT_RETRY,
             )
         except ActivityError as error:

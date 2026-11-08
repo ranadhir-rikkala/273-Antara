@@ -18,6 +18,7 @@ from common.config import settings
 from common.names import Workflows
 from common.queues import RECONCILER
 from common.temporal_client import connect
+from common.worker_runtime import run_until_stopped
 from reconciler.activities import find_inconsistent_versions
 from reconciler.workflows import ReconcilerWorkflow
 
@@ -48,8 +49,9 @@ async def main() -> None:
         workflows=[ReconcilerWorkflow],
         activities=[find_inconsistent_versions],
         max_concurrent_activities=settings.max_concurrent_activities,
+        graceful_shutdown_timeout=timedelta(seconds=25),
     )
-    await worker.run()
+    await run_until_stopped(worker)
 
 
 if __name__ == "__main__":

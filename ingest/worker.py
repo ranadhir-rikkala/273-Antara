@@ -1,10 +1,12 @@
 import asyncio
+from datetime import timedelta
 
 from temporalio.worker import Worker
 
 from common.config import settings
 from common.queues import INGEST_GPU
 from common.temporal_client import connect
+from common.worker_runtime import run_until_stopped
 from ingest.activities import (
     chunk_document,
     extract_document,
@@ -40,8 +42,9 @@ async def main() -> None:
         workflows=workflows,
         activities=activities,
         max_concurrent_activities=settings.max_concurrent_activities,
+        graceful_shutdown_timeout=timedelta(seconds=25),
     )
-    await worker.run()
+    await run_until_stopped(worker)
 
 
 if __name__ == "__main__":

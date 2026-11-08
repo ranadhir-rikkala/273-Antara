@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 
 from temporalio.worker import Worker
 
@@ -18,6 +19,7 @@ from agent.workflows import AgentRunWorkflow, IncidentReportWorkflow
 from common.config import settings
 from common.queues import AGENT, TOOLS
 from common.temporal_client import connect
+from common.worker_runtime import run_until_stopped
 
 
 async def main() -> None:
@@ -29,6 +31,7 @@ async def main() -> None:
             workflows=[IncidentReportWorkflow],
             activities=[execute_tool, open_approval, escalate_approval, expire_approval, report_incident],
             max_concurrent_activities=settings.max_concurrent_activities,
+            graceful_shutdown_timeout=timedelta(seconds=25),
         )
     else:
         worker = Worker(
@@ -43,8 +46,9 @@ async def main() -> None:
                 store_cached_answer,
             ],
             max_concurrent_activities=settings.max_concurrent_activities,
+            graceful_shutdown_timeout=timedelta(seconds=25),
         )
-    await worker.run()
+    await run_until_stopped(worker)
 
 
 if __name__ == "__main__":

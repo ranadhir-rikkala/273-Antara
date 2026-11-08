@@ -16,6 +16,7 @@ from common.names import Activities, Errors
 from common.queue_stats import TemporalQueueInspector
 from common.storage import S3ObjectStore
 from common.temporal_client import shared
+from common.worker_runtime import heartbeating
 from ingest import services
 from ingest.pdf import PypdfPages
 from ingest.postgres import (
@@ -50,7 +51,7 @@ async def select_embed_queue() -> str:
 
 @activity.defn(name=Activities.EMBED)
 async def generate_embeddings(batch: EmbedBatch) -> int:
-    async with model_session() as model:
+    async with heartbeating(), model_session() as model:
         return await services.embed(batch, PostgresChunkStore(await pool()), model)
 
 
