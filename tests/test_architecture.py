@@ -19,6 +19,8 @@ LOGIC = [
     "api/admission.py",
     "api/ops/ports.py",
     "api/ops/services.py",
+    "gateway/ports.py",
+    "gateway/services.py",
     "ingest/ports.py",
     "ingest/dispatch.py",
     "ingest/services.py",

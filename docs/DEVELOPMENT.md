@@ -122,16 +122,14 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 | --- | --- |
 | Ranadhir | Self-revoking access: a durable timer revokes grants after 30 or 7 days (compressed for the demo) |
 | Ranadhir | Incident command: status updates to reporters and auto-close |
-| Prajval | Put PDF reading behind an extractor port, so `ingest/services.py` no longer imports `pypdf` |
-| Prajval | Move the `QueueStats` type into `common/models.py`, so ingest ports and the dispatcher no longer import Temporal |
 | Prajval | Seed script that uploads `demo/policies/` with the right groups for each document |
-| Vinayak | Split the gateway into ports, services and adapters, so the model-busy rule has no HTTP code in it |
-| Vinayak | Move the load-gate rule out of `api/admission.py` into a service with a port for the load reading |
+| Prajval | Heartbeat the embedding activity: when KEDA removes an ingest pod mid-embedding, Temporal now waits the full 5-minute timeout before retrying; a heartbeat timeout would retry in seconds |
+| Vinayak | Separate the rules in `api/runs.py` and `api/auth.py` from Temporal and FastAPI, then add both to `tests/test_architecture.py` |
 | Vinayak | Demo UI: helpdesk and ops console side by side, with guided steps |
 | Manoj | Automated chaos suite that runs every chaos action and prints the measured numbers |
 | Manoj | CI on GitHub Actions: `scripts/check.sh` on every push |
 | Manoj | `docs/DEMO.md` presenter script |
 
-Everyone shares the report and slides; each person writes the section for the promises they present. If you use an AI coding assistant, point it at [AGENTS.md](../AGENTS.md): business rules stay in `services.py` behind `ports.py`, and every outside system is reached through an adapter, so any component can be swapped later.
+Everyone shares the report and slides; each person writes the section for the promises they present. If you use an AI coding assistant, point it at [AGENTS.md](../AGENTS.md): business rules stay in `services.py` behind `ports.py`, and every outside system is reached through an adapter, so any component can be swapped later. `tests/test_architecture.py` enforces this: it fails if a service or port imports anything but the standard library, `common/models.py`, `common/names.py`, `common/queues.py` or other business logic. Add each new service or port file to its list.
 
 AWS deployment steps are in [deploy/aws/README.md](../deploy/aws/README.md).
