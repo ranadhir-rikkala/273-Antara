@@ -48,11 +48,11 @@ patches:
       - {op: add, path: /data/PINNED_MODEL_DIGESTS, value: '{"qwen2.5:1.5b": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b", "nomic-embed-text:latest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"}'}
   - target: {kind: Deployment, name: gateway}
     patch: |-
-      - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama:11434/v1"}
-      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://ollama:11434/v1"}
+      - {op: replace, path: /spec/template/spec/containers/0/env/1/value, value: "http://ollama-0.ollama-pods:11434/v1,http://ollama-1.ollama-pods:11434/v1"}
+      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://ollama-0.ollama-pods:11434/v1,http://ollama-1.ollama-pods:11434/v1"}
   - target: {kind: Deployment, name: ingest-cpu}
     patch: |-
-      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://ollama:11434/v1"}
+      - {op: replace, path: /spec/template/spec/containers/0/env/2/value, value: "http://gateway:8080/v1"}
   - target: {kind: Deployment, name: ingest-gpu}
     patch: |-
       - {op: remove, path: /spec/template/spec/nodeSelector}

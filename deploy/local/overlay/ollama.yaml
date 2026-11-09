@@ -1,13 +1,4 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ollama-models
-  namespace: antara
-spec:
-  accessModes: [ReadWriteOnce]
-  resources: {requests: {storage: 10Gi}}
----
-apiVersion: v1
 kind: Service
 metadata:
   name: ollama
@@ -16,18 +7,36 @@ spec:
   selector: {app: ollama}
   ports: [{port: 11434}]
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-pods
+  namespace: antara
+spec:
+  clusterIP: None
+  selector: {app: ollama}
+  ports: [{port: 11434}]
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: ollama
   namespace: antara
 spec:
-  replicas: 1
-  strategy: {type: Recreate}
+  serviceName: ollama-pods
+  replicas: 2
+  podManagementPolicy: Parallel
   selector: {matchLabels: {app: ollama}}
   template:
     metadata: {labels: {app: ollama}}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: {matchLabels: {app: ollama}}
       containers:
         - name: ollama
           image: ollama/ollama:0.5.4@sha256:18bfb1d605604fd53dcad20d0556df4c781e560ebebcd923454d627c994a0e37
@@ -36,10 +45,12 @@ spec:
             - {name: OLLAMA_NUM_PARALLEL, value: "2"}
           ports: [{containerPort: 11434}]
           readinessProbe:
-            httpGet: {path: /, port: 11434}
+            exec: {command: ["sh", "-c", "ollama list | grep -q qwen2.5"]}
             periodSeconds: 5
           volumeMounts:
             - {name: models, mountPath: /root/.ollama}
-      volumes:
-        - name: models
-          persistentVolumeClaim: {claimName: ollama-models}
+  volumeClaimTemplates:
+    - metadata: {name: models}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 10Gi}}
