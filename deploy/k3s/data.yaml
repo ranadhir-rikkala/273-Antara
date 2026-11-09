@@ -264,16 +264,69 @@ spec:
   replicas: 1
   selector: {matchLabels: {app: object-store}}
   template:
-    metadata: {labels: {app: object-store}}
+    metadata: {labels: {app: object-store, antara/service: object-store, antara/role: primary}}
     spec:
       containers:
         - name: seaweedfs
           image: chrislusf/seaweedfs:3.97@sha256:bb05d66d2963b1cc48073190781c3dd29e2c4c88a2ae2986bf58e38c86d89c6e
-          args: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
+          args: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-master.volumePreallocate=false", "-master.volumeSizeLimitMB=64"]
           ports: [{containerPort: 8333}]
           volumeMounts:
             - {name: data, mountPath: /data}
             - {name: s3-config, mountPath: /etc/seaweedfs, readOnly: true}
+      volumes:
+        - name: s3-config
+          secret: {secretName: object-store-s3}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 20Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: object-store-filer
+  namespace: antara
+spec:
+  selector: {app: object-store}
+  ports:
+    - {name: http, port: 8888}
+    - {name: grpc, port: 18888}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: object-store-replica
+  namespace: antara
+spec:
+  serviceName: object-store-replica
+  replicas: 1
+  selector: {matchLabels: {app: object-store-replica}}
+  template:
+    metadata: {labels: {app: object-store-replica, antara/service: object-store, antara/role: standby}}
+    spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: {matchLabels: {antara/service: object-store}}
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:3.97@sha256:bb05d66d2963b1cc48073190781c3dd29e2c4c88a2ae2986bf58e38c86d89c6e
+          args: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-master.volumePreallocate=false", "-master.volumeSizeLimitMB=64"]
+          ports: [{containerPort: 8333}, {containerPort: 8888}]
+          readinessProbe:
+            tcpSocket: {port: 8888}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: s3-config, mountPath: /etc/seaweedfs, readOnly: true}
+        - name: follow-primary
+          image: chrislusf/seaweedfs:3.97@sha256:bb05d66d2963b1cc48073190781c3dd29e2c4c88a2ae2986bf58e38c86d89c6e
+          args: ["filer.sync", "-a=object-store-filer:8888", "-b=localhost:8888", "-isActivePassive"]
       volumes:
         - name: s3-config
           secret: {secretName: object-store-s3}
