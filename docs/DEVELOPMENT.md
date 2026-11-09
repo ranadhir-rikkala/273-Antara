@@ -63,6 +63,8 @@ Kubernetes runs inside Docker, so nothing extra is installed on your machine. Gi
 
 The cluster has two k3s nodes and every service runs one copy on each (34 pods): stateless services serve from both, the databases and object store run a primary on node 1 with a streaming standby on node 2, Temporal runs two clustered servers, and Ollama runs a primary and a standby behind the gateway. See [DECISIONS.md](DECISIONS.md) §5. Node 2 is tainted so only Antara's own pods run there. `scripts/local-cluster.sh` starts both nodes (and raises the VM's inotify limit, which two nodes need).
 
+`scripts/setup.sh` does all of the steps below in order, including loading the demo documents with `scripts/seed.sh`, and is safe to run again. The individual steps:
+
 ```bash
 scripts/local-cluster.sh
 export KUBECONFIG=$PWD/deploy/local/.kube/kubeconfig.yaml

@@ -4,9 +4,8 @@ cd "$(dirname "$0")/../deploy/local"
 export KUBECONFIG="$PWD/.kube/kubeconfig.yaml"
 case "${1:-up}" in
   up)
-    if command -v colima >/dev/null; then
-      colima ssh -- sudo sysctl -q -w fs.inotify.max_user_instances=1024 fs.inotify.max_user_watches=524288
-    fi
+    docker run --rm --privileged busybox:1.36.1@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662 \
+      sysctl -w fs.inotify.max_user_instances=1024 fs.inotify.max_user_watches=524288 >/dev/null
     docker compose up -d k3s
     until docker exec antara-k3s-k3s-1 test -s /var/lib/rancher/k3s/server/token 2>/dev/null; do sleep 2; done
     printf 'K3S_TOKEN=%s\n' "$(docker exec antara-k3s-k3s-1 cat /var/lib/rancher/k3s/server/token)" > .env

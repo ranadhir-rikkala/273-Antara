@@ -1,5 +1,17 @@
 # Antara Sovereign AI
 
+### Quick start
+
+Needs Docker with 8 CPUs and 16 GB of memory (a computer with 24 GB or more), `kubectl`, `curl` and about 40 GB of free disk. On a Mac: `brew install colima docker kubectl && colima start --cpu 8 --memory 16`. On Windows, run it inside WSL2.
+
+```bash
+git clone https://github.com/ranadhir-rikkala/273-Antara.git
+cd 273-Antara
+scripts/setup.sh
+```
+
+The script starts a two-node Kubernetes cluster in Docker, installs KEDA, builds and deploys every service (34 pods), downloads the two models, blocks internet access again and loads the demo documents. The first run takes about 20 minutes, mostly downloads; running it again only repairs what is missing. Then open the helpdesk at http://localhost:8000 and the operations console at http://localhost:8000/ops (choose erin · Operator).
+
 ### Abstract
 
 Antara Sovereign AI provides a private RAG pipeline and an agentic harness built on top of it. Multiple document workers extract text, split it into sections, generate embeddings, and build a searchable index. The agentic harness uses this retrieval layer and private language models to answer questions and carry out permitted internal tasks.
