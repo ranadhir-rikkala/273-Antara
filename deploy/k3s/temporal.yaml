@@ -13,11 +13,17 @@ metadata:
   name: temporal
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: temporal}}
   template:
     metadata: {labels: {app: temporal}}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      topologySpreadConstraints:
+        - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: temporal}}}
       containers:
         - name: temporal
           image: temporalio/auto-setup:1.25.2@sha256:b1edc1e20002d958c8182f2ae08dee877a125083683a627a44917683419ba6a8
