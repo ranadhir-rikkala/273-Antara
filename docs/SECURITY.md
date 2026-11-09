@@ -23,4 +23,5 @@ A default-deny NetworkPolicy lets pods talk only to each other, to cluster DNS a
 
 - Header sign-in (the demo mode) trusts the user named in the request. Real deployments use the OIDC mode, where identity comes from a signed token.
 - There is no per-user rate limit yet; the limits above are shared by everyone.
+- The observability tools (Grafana, Jaeger, Prometheus, Temporal UI) have no login. Anyone who can reach the app can read them, including every question and answer in the Temporal UI, which is read-only. Production puts them behind single sign-on.
 - The application image `antara-app` is built from this repository on each deploy rather than pinned by digest.

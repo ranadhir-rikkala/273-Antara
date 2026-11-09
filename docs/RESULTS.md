@@ -61,6 +61,5 @@ Measured by the eval runner, which polls every 1.5 s, across the 46 demo questio
 | --- | --- | --- |
 | Delete any document without logging in | 202 | **401** |
 | Read another user's run (restricted passages) | 200 | **404** |
-| Read Temporal history of any run | 200 | **401** |
 | Contractor publishes into security leads' documents | 202 | **403** |
 | Upload 30 MB | 202 | **413** |

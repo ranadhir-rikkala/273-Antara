@@ -10,7 +10,7 @@ flowchart LR
 
     subgraph cluster["Kubernetes namespace antara · default-deny network policy: no internet"]
         direction LR
-        ingress["Ingress (Traefik)<br/>tools behind operator password"]
+        ingress["Ingress (Traefik)<br/>app and observability tools"]
 
         subgraph edge["Admission"]
             api["API ×2 replicas<br/>auth · 429 load gates"]

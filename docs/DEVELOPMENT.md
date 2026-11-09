@@ -72,7 +72,7 @@ kubectl -n antara exec deploy/ollama -- ollama pull nomic-embed-text
 scripts/local-deploy.sh
 ```
 
-Grafana, Jaeger, Prometheus and the Temporal UI are at `/grafana`, `/jaeger`, `/prometheus` and `/temporal` behind an operator password (user `operator`; `scripts/local-deploy.sh` creates the password once in `deploy/local/.kube/ops-tools-password`, which git ignores). The Temporal UI is read-only.
+Grafana, Jaeger, Prometheus and the Temporal UI are at `/grafana`, `/jaeger`, `/prometheus` and `/temporal`, with no login: anyone who can reach the app can read them, including every question and answer in the Temporal UI. The Temporal UI is read-only.
 
 Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only between pods in the namespace, to cluster DNS, and to the Kubernetes API on private addresses. Downloading the models is the one step that needs the internet, so it lifts the policy for the download and `scripts/local-deploy.sh` puts it back. Models stay on the Ollama volume afterwards.
 

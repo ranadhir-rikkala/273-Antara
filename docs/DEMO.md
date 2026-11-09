@@ -10,7 +10,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 4. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
 5. Open both windows and hard-refresh (Cmd+Shift+R). On the console, click **Prove it** once so "Internet access: Blocked" shows.
-6. Open Grafana (`/grafana`) and Jaeger (`/jaeger`) in tabs and sign in once: user `operator`, password in `deploy/local/.kube/ops-tools-password`.
+6. Open Grafana (`/grafana`) and Jaeger (`/jaeger`) in tabs.
 7. Keep a screen recording of a full run as a backup.
 
 ## Run of show
