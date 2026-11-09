@@ -139,6 +139,8 @@ def main() -> None:
             outcomes.append(outcome)
             mark = "PASS" if outcome.passed else "FAIL"
             print(f"{mark} {case['id']:<24} {seconds:6.1f}s {'; '.join(outcome.failures)}")
+            if not outcome.passed:
+                print(f"     answer: {(state.get('answer') or '')[:200]!r}")
         deny_leftover_approvals(client)
         remove_fixtures(client, fixture_ids)
 

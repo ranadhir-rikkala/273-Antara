@@ -639,5 +639,82 @@
         "webmail"
       ]
     }
+  },
+  {
+    "id": "export-limit",
+    "question": "How many customer records can I export at once without approval?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "1,000",
+        "1000"
+      ]
+    }
+  },
+  {
+    "id": "phishing-password-email",
+    "question": "I got a suspicious email asking for my password, what should I do?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "Report Phishing",
+        "report phishing",
+        "security incident"
+      ],
+      "answer_excludes": [
+        "webmail"
+      ]
+    }
+  },
+  {
+    "id": "approval-to-export-is-a-question",
+    "question": "Do I need approval to export 5,000 customer records?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "no_tools": true
+    }
+  },
+  {
+    "id": "failover-who",
+    "question": "Who is allowed to start a failover to the disaster recovery site?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "head of engineering"
+      ]
+    }
+  },
+  {
+    "id": "visitor-wifi",
+    "question": "Which Wi-Fi network should visitors use?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "GUEST"
+      ]
+    }
+  },
+  {
+    "id": "prod-write-approval",
+    "question": "Who must approve write access to production databases?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "security"
+      ]
+    }
   }
 ]

@@ -221,19 +221,38 @@
         </div>
       </div>
       <div class="everyday">
-        <label class="label" for="helpdesk-samples">More</label>
+        <label class="label" for="helpdesk-samples">Browse</label>
         <select id="helpdesk-samples">
-          <option value="">Common questions…</option>
-          <option>How do contractors get VPN access?</option>
-          <option>How often do standard account passwords have to be rotated?</option>
-          <option>Can I deploy to production on a Friday?</option>
-          <option>I got a weird email asking me to click a link, what do I do?</option>
-          <option>How do I get access to GitHub?</option>
-          <option>Can I install Slack from the internet?</option>
-          <option>How quickly must on-call respond to a SEV1?</option>
-          <option>I need read access to the production database for the billing migration</option>
-          <option>Please create a ticket: my laptop screen does not lock after 5 minutes</option>
-          <option>The VPN is down for me since this morning</option>
+          <option value="">Choose a question…</option>
+          <optgroup label="IT support">
+            <option>How do I get access to GitHub?</option>
+            <option>How do contractors get VPN access?</option>
+            <option>Does the VPN work on Linux?</option>
+            <option>Which Wi-Fi network should visitors use?</option>
+            <option>What do I need to print in colour?</option>
+            <option>How quickly must I report a lost laptop?</option>
+          </optgroup>
+          <optgroup label="Security &amp; compliance">
+            <option>Where am I allowed to store customer email addresses?</option>
+            <option>Can I paste customer data into ChatGPT to summarise it?</option>
+            <option>Who must approve write access to production databases?</option>
+            <option>How many customer records can I export at once without approval?</option>
+            <option>I got a suspicious email asking for my password, what should I do?</option>
+          </optgroup>
+          <optgroup label="Engineering &amp; operations">
+            <option>Can we deploy to production on a Friday afternoon?</option>
+            <option>When is the annual code freeze?</option>
+            <option>How many code reviews does a change to payments need?</option>
+            <option>How quickly must on-call respond to a SEV1 incident?</option>
+            <option>How much data can we lose if a customer-facing database fails?</option>
+            <option>Who is allowed to start a failover to the disaster recovery site?</option>
+          </optgroup>
+          <optgroup label="Requests &amp; incidents">
+            <option>I need read access to the production database for the billing migration</option>
+            <option>Please create a ticket: the printer on floor 3 keeps jamming since this morning</option>
+            <option>VPN down, what should I do?</option>
+            <option>Email is down, any workaround?</option>
+          </optgroup>
         </select>
       </div>
     </div>
