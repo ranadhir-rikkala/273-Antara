@@ -91,7 +91,16 @@
   .cite p { margin: 3px 0 0; color: var(--soft); }
 
   .receipt { margin-top: 12px; border: 1px solid var(--line); border-radius: 6px; }
-  .receipt-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .receipt-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 10px; background: var(--bg); border-radius: 6px; cursor: pointer; list-style: none; }
+  .receipt-head::-webkit-details-marker { display: none; }
+  .receipt-head .label::before { content: "›"; display: inline-block; margin-right: 6px; transition: transform .15s; }
+  .receipt[open] .receipt-head { border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; }
+  .receipt[open] .receipt-head .label::before { transform: rotate(90deg); }
+  .receipt-head .verdict { flex: 1; font-size: 12px; color: var(--soft); }
+  .receipt-head .verdict b { font-weight: 600; }
+  .receipt-head .verdict .ok { color: var(--ok); }
+  .receipt-head .verdict .acted { color: var(--warn); }
+  .receipt-head .verdict .leak { color: var(--bad); }
   .receipt-head a { font-size: 12px; }
   .checks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
   @media (max-width: 760px) { .checks { grid-template-columns: minmax(0, 1fr); } }
@@ -551,14 +560,27 @@ async function showReceipt(node, state, traceId) {
     check("Grounding", checks.grounded),
     check("Filtering", checks.filtered),
     check("Actions", checks.actions));
-  const receipt = el("div", { class: "receipt" }, el("div", { class: "receipt-head" }, el("span", { class: "label" }, "AI guardrails"), traceLink), grid);
+  const verdict = el("span", { class: "verdict" });
+  const receipt = el("details", { class: "receipt" }, el("summary", { class: "receipt-head" }, el("span", { class: "label" }, "AI guardrails"), verdict, traceLink), grid);
   node.receipt?.remove();
   node.receipt = receipt;
   node.body.append(receipt);
-  if (!traceId) { grid.firstChild.replaceWith(check("Network", ["na", "Tracing is off"])); return; }
+  summarize(grid, verdict);
+  if (!traceId) { grid.firstChild.replaceWith(check("Network", ["na", "Tracing is off"])); summarize(grid, verdict); return; }
   const [result, spans] = await networkCheck(traceId);
   grid.firstChild.replaceWith(check("Network", result));
+  summarize(grid, verdict);
   if (spans && traceLink) traceLink.textContent = `View trace · ${spans} spans ↗`;
+}
+
+function summarize(grid, verdict) {
+  const count = (tone) => grid.querySelectorAll(`.check.${tone}`).length;
+  const parts = [];
+  if (count("leak")) parts.push(el("b", { class: "leak" }, "✕ Data left the cluster"));
+  if (count("ok")) parts.push(el("b", { class: "ok" }, `✓ ${count("ok")} passed`));
+  if (count("acted")) parts.push(el("b", { class: "acted" }, `⚑ ${count("acted")} acted`));
+  if (count("pending")) parts.push(el("span", {}, "checking network…"));
+  verdict.replaceChildren(...parts.flatMap((part, index) => (index ? [" · ", part] : [part])));
 }
 
 const UNAVAILABLE_AFTER_MS = 5000;
