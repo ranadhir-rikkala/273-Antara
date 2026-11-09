@@ -154,6 +154,49 @@
   .incident { display: flex; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
   .incident:last-child { border-bottom: 0; }
   .incident b { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-right: 8px; padding: 1px 6px; border-radius: 4px; background: var(--warn-tint); color: var(--warn); }
+
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .pod { animation: none; }
+  .map { display: grid; grid-template-columns: minmax(150px, 1fr) 28px minmax(190px, 1.2fr) 28px minmax(220px, 1.6fr) 28px minmax(200px, 1.3fr); padding: 16px; gap: 0; align-items: stretch; }
+  @media (max-width: 1100px) { .map { grid-template-columns: minmax(0, 1fr); gap: 10px; } .lane { display: none; } }
+  .col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .col > .label { font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .lane { position: relative; }
+  .lane::before { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; border-top: 2px dashed var(--line); }
+  .lane::after { content: "›"; position: absolute; right: 2px; top: 50%; transform: translateY(-55%); color: var(--muted); font-size: 16px; }
+  .lane.active::before { border-top-color: var(--accent); animation: flow .8s linear infinite; background: none; }
+  .lane.active::after { color: var(--accent); }
+  @keyframes flow { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  .node { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--panel); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .node.degraded { border-color: var(--warn); }
+  .node.down { border-color: var(--bad); background: var(--bad-tint); }
+  .node-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .node-head b { font: 600 12.5px/1.3 var(--mono); }
+  .node .role { font-size: 11.5px; color: var(--muted); }
+  .node .stats { font-size: 11.5px; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .state { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--ok-tint); color: var(--ok); white-space: nowrap; }
+  .state.scaling { background: var(--accent-tint); color: var(--accent); }
+  .state.degraded { background: var(--warn-tint); color: var(--warn); }
+  .state.down { background: var(--bad-tint); color: var(--bad); }
+  .podrow { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .pod { position: relative; width: 14px; height: 14px; border-radius: 4px; background: var(--ok); display: inline-block; box-shadow: 0 0 0 0 var(--ok); animation: beat 2.4s ease-out infinite; }
+  @keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(21, 128, 61, .45); } 70% { box-shadow: 0 0 0 6px rgba(21, 128, 61, 0); } 100% { box-shadow: 0 0 0 0 rgba(21, 128, 61, 0); } }
+  .pod.starting { background: var(--warn); animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+  .pod.terminating, .pod.killed { background: var(--bad); animation: none; }
+  .pod.terminating::after, .pod.killed::after { content: "✕"; position: absolute; inset: 0; color: #fff; font: 700 10px/14px var(--sans); text-align: center; }
+  .pod.killed { opacity: .85; }
+  .podnote { font-size: 11px; font-weight: 600; color: var(--bad); }
+  .queues { display: grid; gap: 4px; }
+  .q { display: grid; grid-template-columns: 74px minmax(0, 1fr) 28px; gap: 6px; align-items: center; font: 11px/1.3 var(--mono); color: var(--soft); }
+  .q .bar { height: 5px; background: var(--hair); border-radius: 3px; overflow: hidden; }
+  .q .bar span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+  .q .num { text-align: right; }
+  .obs { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); align-items: center; }
+  .obs > .label { font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+  .chipnode { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 6px; font: 500 11.5px/1.3 var(--mono); }
+  @media (prefers-reduced-motion: reduce) { .pod, .pod.starting, .lane.active::before { animation: none; } }
 </style>
 </head>
 <body>
@@ -188,18 +231,12 @@
     </div>
     <div id="probes"></div>
   </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Cluster</h2><div class="legend"><span><i class="pod"></i>Running</span><span><i class="pod starting"></i>Starting</span><span><i class="pod terminating"></i>Stopping or killed</span></div></div>
+    <div class="map" id="map"></div>
+  </section>
   <div class="grid">
     <div>
-      <section class="panel">
-        <div class="panel-head"><h2>Services</h2><small>Autoscaled by KEDA on queue backlog</small></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Service</th><th>Pods</th><th>Scaling</th><th class="n">Queued</th><th class="n">Tasks/s</th><th class="n">Restarts</th></tr></thead>
-            <tbody id="services"></tbody>
-          </table>
-        </div>
-        <div class="platform" id="platform"></div>
-      </section>
       <section class="panel">
         <div class="panel-head"><h2>Distributed-systems mechanisms</h2><small>Live</small></div>
         <div class="table-wrap">
@@ -361,7 +398,11 @@ function absorb(state) {
       }
     }
   }
-  for (const [name, pod] of before) if (!now.has(name)) note("info", `${pod.app}: pod removed`);
+  for (const [name, pod] of before) {
+    if (now.has(name)) continue;
+    note("info", `${pod.app}: pod removed`);
+    ghosts.set(name, { app: pod.app, until: Date.now() + GHOST_MS });
+  }
   if (!previous.model.chaos && state.model.chaos) note("chaos", "Model gateway failing requests");
   if (previous.model.chaos && !state.model.chaos) note("heal", "Model gateway healthy again");
 }
@@ -383,6 +424,71 @@ function egressStat(state) {
   if (!check) return stat("Egress", "Not checked", "Run egress check", "");
   const sealed = check.blocked === check.total;
   return stat("Egress", sealed ? "Blocked" : "Open", `${check.blocked}/${check.total} external endpoints refused · ${ago(check.at)}`, sealed ? "sealed" : "bad", true);
+}
+
+const ghosts = new Map();
+const GHOST_MS = 6000;
+
+function podSquares(app, pods) {
+  const squares = pods.map((pod) => el("span", {
+    class: `pod ${pod.terminating ? "terminating" : pod.ready ? "" : "starting"}`,
+    title: `${pod.name} · ${pod.terminating ? "stopping" : pod.ready ? "running" : "starting"} · ${pod.restarts} restarts`,
+  }));
+  const now = Date.now();
+  const dead = [...ghosts].filter(([, ghost]) => ghost.app === app && ghost.until > now);
+  for (const [name] of dead) squares.push(el("span", { class: "pod killed", title: `${name} · killed` }));
+  return { squares, killed: dead.length };
+}
+
+function mapNode(app, role, pods, extra = [], desired = 1) {
+  const { squares, killed } = podSquares(app, pods);
+  const ready = pods.filter((pod) => pod.ready && !pod.terminating).length;
+  const state = ready === 0 ? "down" : killed || pods.some((pod) => pod.terminating || !pod.ready) ? "degraded" : pods.length > desired ? "scaling" : "healthy";
+  const label = { down: "Down", degraded: killed ? "Recovering" : "Degraded", scaling: "Scaled out", healthy: "Healthy" }[state];
+  const row = el("div", { class: "podrow" }, ...squares);
+  if (killed) row.append(el("span", { class: "podnote" }, "Killed"));
+  return el("div", { class: `node ${state === "down" ? "down" : state === "degraded" ? "degraded" : ""}` },
+    el("div", { class: "node-head" }, el("b", {}, app), el("span", { class: `state ${state}` }, label)),
+    el("div", { class: "role" }, role), row, ...extra);
+}
+
+function renderMap(state, podsByApp, queues, rates) {
+  if (state.errors.pods) { $("map").replaceChildren(el("div", { class: "empty" }, `Pods unavailable: ${state.errors.pods}`)); return; }
+  const pods = (app) => podsByApp.get(app) || [];
+  const rate = (app) => pods(app).reduce((sum, pod) => sum + (rates[pod.name] || 0), 0);
+  const backlog = (name) => { const q = queues.get(name); return q && !q.error ? q.backlog : 0; };
+  const worker = (service) => mapNode(service.app, service.role, pods(service.app), [
+    el("div", { class: "stats" }, `queue ${backlog(service.queue)} · ${rate(service.app).toFixed(2)}/s${service.max ? ` · ${pods(service.app).length}/${service.max} pods` : ""}`),
+  ]);
+  const maxBacklog = Math.max(10, ...state.queues.map((q) => q.backlog || 0));
+  const busy = state.queues.some((q) => q.backlog) || Object.values(rates).some((r) => r >= 0.01);
+  const lane = () => el("div", { class: `lane ${busy ? "active" : ""}` });
+  const col = (label, ...nodes) => el("div", { class: "col" }, el("span", { class: "label" }, label), ...nodes);
+  const byApp = new Map(SERVICES.map((service) => [service.app, service]));
+  const obs = ["prometheus", "grafana", "jaeger", "temporal-ui"].map((app) => {
+    const { squares } = podSquares(app, pods(app));
+    return el("span", { class: "chipnode" }, ...squares, app);
+  });
+  $("map").replaceChildren(
+    col("Edge", mapNode("api", "HTTP API · admission (429)", pods("api"), [], 2)),
+    lane(),
+    col("Messaging",
+      mapNode("temporal", "Durable workflows · task queues", pods("temporal"), [
+        el("div", { class: "queues" }, ...state.queues.map((q) => el("div", { class: "q" },
+          el("span", {}, q.name), el("div", { class: "bar" }, el("span", { style: `width:${Math.min(100, ((q.backlog || 0) / maxBacklog) * 100)}%` })),
+          el("span", { class: "num" }, q.error ? "?" : q.backlog)))),
+      ]),
+      mapNode("temporal-db", "Workflow state", pods("temporal-db"))),
+    lane(),
+    col("Workers", ...["agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler"].map((app) => worker(byApp.get(app)))),
+    lane(),
+    col("Models & data",
+      mapNode("gateway", "Model gateway · caps · digests", pods("gateway")),
+      mapNode("ollama", "qwen2.5:1.5b · nomic-embed-text", pods("ollama")),
+      mapNode("app-db", "Postgres + pgvector", pods("app-db")),
+      mapNode("object-store", "S3 object store", pods("object-store"))),
+    el("div", { class: "obs" }, el("span", { class: "label" }, "Observability"), ...obs),
+  );
 }
 
 function promise(number, name, plain, now, prove, tone = "") {
@@ -421,37 +527,7 @@ function render(state) {
       modelDown ? "bad" : "", true),
   );
 
-  $("services").replaceChildren(...SERVICES.map((service) => {
-    const pods = podsByApp.get(service.app) || [];
-    const ready = readyCount(service.app);
-    const queue = service.queue ? queues.get(service.queue) : null;
-    const backlog = queue && !queue.error ? queue.backlog : null;
-    const rate = pods.reduce((sum, pod) => sum + (rates[pod.name] || 0), 0);
-    const podRestarts = pods.reduce((sum, pod) => sum + (pod.restarts || 0), 0);
-    const scaled = service.max && pods.length > 1;
-    return el("tr", {},
-      el("td", {}, el("div", { class: "svc" }, service.app), el("div", { class: "role" }, service.role)),
-      el("td", {}, el("div", { class: "pods" },
-        ...pods.map((pod) => el("span", {
-          class: `pod ${pod.terminating ? "terminating" : pod.ready ? "" : "starting"}`,
-          title: `${pod.name} · ${pod.terminating ? "stopping" : pod.ready ? "ready" : "starting"} · ${pod.restarts} restarts`,
-        })),
-        el("b", {}, `${ready}/${pods.length}`))),
-      el("td", {}, el("span", { class: `scale ${scaled ? "up" : ""}` }, service.max ? `KEDA 1 → ${service.max}` : service.scale)),
-      el("td", { class: `n ${backlog > 20 ? "warn-text" : backlog ? "" : "zero"}` }, backlog === null ? "—" : backlog),
-      el("td", { class: `n ${rate >= 0.01 ? "" : "zero"}` }, service.queue ? rate.toFixed(2) : "—"),
-      el("td", { class: `n ${podRestarts ? "" : "zero"}` }, podRestarts),
-    );
-  }));
-  if (state.errors.pods) $("services").replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "muted" }, `Pods unavailable: ${state.errors.pods}`)));
-
-  const platform = state.pods.filter((pod) => !SERVICE_APPS.has(pod.app));
-  const platformReady = platform.filter((pod) => pod.ready && !pod.terminating).length;
-  $("platform").replaceChildren(
-    el("b", {}, "Platform"),
-    el("span", { class: platformReady === platform.length ? "" : "warn-text" }, `${platformReady}/${platform.length} ready`),
-    el("span", { class: "tag" }, [...new Set(platform.map((pod) => pod.app))].sort().join(" · ")),
-  );
+  renderMap(state, podsByApp, queues, rates);
 
   const busyPods = Object.values(rates).filter((rate) => rate >= 0.01).length;
   const docs = state.counts.documents || {};
