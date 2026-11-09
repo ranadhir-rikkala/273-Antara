@@ -9,7 +9,7 @@ data:
   LLM_BASE_URL: http://gateway:8080/v1
   LLM_MODEL: qwen2.5-7b-instruct
   EMBEDDING_MODEL: nomic-embed-text-v1.5
-  OTEL_ENDPOINT: http://jaeger:4317
+  OTEL_ENDPOINT: http://otel-collector:4317
   TEMPORAL_METRICS_PORT: "9464"
   AUTH_MODE: headers
 ---
