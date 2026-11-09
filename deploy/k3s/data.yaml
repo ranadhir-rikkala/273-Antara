@@ -1,4 +1,29 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-replication
+  namespace: antara
+data:
+  pg_hba.conf: |
+    local   all          all                trust
+    host    all          all  127.0.0.1/32  trust
+    host    all          all  ::1/128       trust
+    local   replication  all                trust
+    host    replication  all  all           scram-sha-256
+    host    all          all  all           scram-sha-256
+  standby.sh: |
+    set -e
+    if [ ! -s "$PGDATA/PG_VERSION" ]; then
+      until pg_isready -h "$PRIMARY" -U "$PGUSER" -q; do sleep 2; done
+      slots=$(psql -h "$PRIMARY" -U "$PGUSER" -d postgres -tAc "select count(*) from pg_replication_slots where slot_name = 'standby'")
+      [ "$slots" = 1 ] || psql -h "$PRIMARY" -U "$PGUSER" -d postgres -qc "select pg_create_physical_replication_slot('standby')"
+      pg_basebackup -h "$PRIMARY" -U "$PGUSER" -D "$PGDATA" -X stream -S standby
+      touch "$PGDATA/standby.signal"
+      printf "primary_conninfo = 'host=%s user=%s password=%s application_name=%s'\nprimary_slot_name = 'standby'\n" "$PRIMARY" "$PGUSER" "$PGPASSWORD" "$HOSTNAME" >> "$PGDATA/postgresql.auto.conf"
+      chmod 700 "$PGDATA"
+    fi
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: app-db
@@ -17,10 +42,11 @@ spec:
   replicas: 1
   selector: {matchLabels: {app: app-db}}
   template:
-    metadata: {labels: {app: app-db}}
+    metadata: {labels: {app: app-db, antara/service: app-db, antara/role: primary}}
     spec:
       containers:
         - name: postgres
+          args: ["postgres", "-c", "hba_file=/etc/postgresql/replication/pg_hba.conf"]
           image: pgvector/pgvector:pg16@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f
           env:
             - {name: POSTGRES_USER, value: antara}
@@ -35,9 +61,12 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
             - {name: schema, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
       volumes:
         - name: schema
           configMap: {name: app-db-schema}
+        - name: replication
+          configMap: {name: postgres-replication}
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
@@ -63,10 +92,11 @@ spec:
   replicas: 1
   selector: {matchLabels: {app: temporal-db}}
   template:
-    metadata: {labels: {app: temporal-db}}
+    metadata: {labels: {app: temporal-db, antara/service: temporal-db, antara/role: primary}}
     spec:
       containers:
         - name: postgres
+          args: ["postgres", "-c", "hba_file=/etc/postgresql/replication/pg_hba.conf"]
           image: postgres:16@sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32
           env:
             - {name: POSTGRES_USER, value: temporal}
@@ -79,6 +109,124 @@ spec:
             periodSeconds: 5
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
+      volumes:
+        - name: replication
+          configMap: {name: postgres-replication}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 10Gi}}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: app-db-standby
+  namespace: antara
+spec:
+  serviceName: app-db-standby
+  replicas: 1
+  selector: {matchLabels: {app: app-db-standby}}
+  template:
+    metadata: {labels: {app: app-db-standby, antara/service: app-db, antara/role: standby}}
+    spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: {matchLabels: {antara/service: app-db}}
+      initContainers:
+        - name: clone-primary
+          image: pgvector/pgvector:pg16@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f
+          command: ["sh", "/etc/postgresql/replication/standby.sh"]
+          securityContext: {runAsUser: 999, runAsGroup: 999}
+          env:
+            - {name: PRIMARY, value: app-db}
+            - {name: PGUSER, value: antara}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: antara-secrets, key: POSTGRES_PASSWORD}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f
+          args: ["postgres", "-c", "hba_file=/etc/postgresql/replication/pg_hba.conf"]
+          env:
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: antara-secrets, key: POSTGRES_PASSWORD}}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "antara"]}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
+      volumes:
+        - name: replication
+          configMap: {name: postgres-replication}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 10Gi}}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: temporal-db-standby
+  namespace: antara
+spec:
+  serviceName: temporal-db-standby
+  replicas: 1
+  selector: {matchLabels: {app: temporal-db-standby}}
+  template:
+    metadata: {labels: {app: temporal-db-standby, antara/service: temporal-db, antara/role: standby}}
+    spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: {matchLabels: {antara/service: temporal-db}}
+      initContainers:
+        - name: clone-primary
+          image: postgres:16@sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32
+          command: ["sh", "/etc/postgresql/replication/standby.sh"]
+          securityContext: {runAsUser: 999, runAsGroup: 999}
+          env:
+            - {name: PRIMARY, value: temporal-db}
+            - {name: PGUSER, value: temporal}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: antara-secrets, key: TEMPORAL_DB_PASSWORD}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
+      containers:
+        - name: postgres
+          image: postgres:16@sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32
+          args: ["postgres", "-c", "hba_file=/etc/postgresql/replication/pg_hba.conf"]
+          env:
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: antara-secrets, key: TEMPORAL_DB_PASSWORD}}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "temporal"]}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: replication, mountPath: /etc/postgresql/replication, readOnly: true}
+      volumes:
+        - name: replication
+          configMap: {name: postgres-replication}
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
