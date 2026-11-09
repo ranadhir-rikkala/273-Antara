@@ -17,5 +17,23 @@ services:
       - "6443:6443"
       - "8000:80"
 
+  worker:
+    image: rancher/k3s:v1.31.4-k3s1
+    command: ["agent", "--node-label=antara.dev/tier=workers", "--node-taint=antara.dev/workers-only=true:NoSchedule"]
+    hostname: antara-worker
+    privileged: true
+    depends_on: [k3s]
+    tmpfs:
+      - /run
+      - /var/run
+    environment:
+      K3S_URL: https://k3s:6443
+      K3S_TOKEN: ${K3S_TOKEN:-}
+    volumes:
+      - worker-data:/var/lib/rancher/k3s
+      - worker-node:/etc/rancher/node
+
 volumes:
   k3s-data:
+  worker-data:
+  worker-node:
