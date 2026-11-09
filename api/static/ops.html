@@ -3,258 +3,243 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Antara Operations</title>
+<title>Antara · Operations</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect x='1.5' y='1.5' width='27' height='27' rx='3' fill='none' stroke='%231f5a48' stroke-width='2' stroke-dasharray='3 2.5'/%3E%3Crect x='9' y='9' width='12' height='12' rx='1.5' fill='%231f5a48'/%3E%3C/svg%3E">
 <style>
   :root {
-    --paper: #f4f3ef; --panel: #ffffff; --ink: #1b1d1a; --soft: #474b45; --muted: #767a72; --line: #dedbd2; --hair: #eceae4;
-    --vault: #1f5a48; --vault-tint: #e3ece7; --amber: #95580a; --amber-tint: #f6ead6; --brick: #a3321f; --brick-tint: #f7e3de; --good: #2b6b3a;
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #0f172a; --soft: #334155; --muted: #64748b; --line: #e2e8f0; --hair: #eef2f6;
+    --accent: #1f5a48; --accent-tint: #e7f0ec; --ok: #15803d; --ok-tint: #dcfce7; --warn: #b45309; --warn-tint: #fef3c7; --bad: #b91c1c; --bad-tint: #fee2e2;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --paper: #111311; --panel: #181b18; --ink: #e8e6de; --soft: #c0beb5; --muted: #8b8e86; --line: #2c302b; --hair: #222622;
-      --vault: #7fc4a6; --vault-tint: #1b2a23; --amber: #e3ad5c; --amber-tint: #2b2316; --brick: #ef8a75; --brick-tint: #2d1c18; --good: #8fd19e;
+      --bg: #0b0f14; --panel: #11161d; --ink: #e5e7eb; --soft: #cbd5e1; --muted: #94a3b8; --line: #1f2937; --hair: #18202b;
+      --accent: #7fc4a6; --accent-tint: #12251e; --ok: #4ade80; --ok-tint: #0f2a1a; --warn: #fbbf24; --warn-tint: #2a2110; --bad: #f87171; --bad-tint: #2a1414;
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { background: var(--paper); }
-  body { margin: 0; color: var(--ink); font: 13.5px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
-  a { color: var(--vault); text-underline-offset: 3px; }
+  html, body { background: var(--bg); }
+  body { margin: 0; color: var(--ink); font: 13px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
   select, button { font: inherit; color: inherit; }
   .muted { color: var(--muted); }
 
   .top { background: var(--panel); border-bottom: 1px solid var(--line); }
-  .top-inner { max-width: 1440px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
-  .brand svg { color: var(--vault); flex: none; }
-  .brand b { font-size: 15px; }
-  .brand span { color: var(--muted); }
-  .brand a { font-size: 12.5px; margin-left: 14px; }
+  .top-inner { max-width: 1440px; margin: 0 auto; padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 20px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 14px; }
+  .brand svg { color: var(--accent); flex: none; }
+  .nav { display: flex; align-items: stretch; height: 100%; gap: 4px; margin-left: 8px; margin-right: auto; }
+  .nav a { display: flex; align-items: center; padding: 0 10px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; }
+  .nav a:hover { color: var(--ink); text-decoration: none; }
+  .nav a.current { color: var(--ink); border-bottom-color: var(--accent); }
+  .env { font: 500 11px/1 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
   .live { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 7px; }
-  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
-  .live.stale::before { background: var(--brick); }
-  select { appearance: none; border: 1px solid var(--line); background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23767a72' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
-           border-radius: 4px; padding: 5px 28px 5px 9px; cursor: pointer; font-size: 12.5px; }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .live.stale::before { background: var(--bad); }
+  select { appearance: none; border: 1px solid var(--line); background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
+           border-radius: 6px; padding: 5px 28px 5px 10px; cursor: pointer; font-size: 12.5px; }
 
   main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 40px; }
-  @media (max-width: 1000px) { main { padding: 14px; } .top-inner { padding: 10px 14px; } }
-  #denied { padding: 10px 12px; background: var(--brick-tint); color: var(--brick); border-radius: 4px; margin-bottom: 16px; }
+  @media (max-width: 1000px) { main { padding: 14px; } .top-inner { padding: 0 14px; gap: 12px; } .env { display: none; } }
+  @media (max-width: 640px) { .live { display: none; } .nav { margin-left: 0; } .nav a { padding: 0 6px; } .top-inner { gap: 8px; } select { max-width: 130px; } }
+  .page-title { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 0 16px; gap: 12px; flex-wrap: wrap; }
+  .page-title h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  .page-title span { color: var(--muted); font-size: 12.5px; }
+  #denied { padding: 10px 12px; background: var(--bad-tint); color: var(--bad); border-radius: 6px; margin-bottom: 16px; }
 
-  .health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
+  .health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
   @media (max-width: 1100px) { .health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .stat { padding: 12px 16px; border-right: 1px solid var(--hair); }
+  .stat { padding: 14px 16px; border-right: 1px solid var(--hair); min-width: 0; }
   .stat:last-child { border-right: 0; }
-  .stat .name { font-size: 12px; color: var(--muted); }
-  .stat .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; display: flex; align-items: center; gap: 8px; }
-  .stat .hint { font-size: 11.5px; color: var(--muted); }
-  .stat.warn .value { color: var(--amber); }
-  .stat.bad .value { color: var(--brick); }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); flex: none; }
-  .stat.bad .dot { background: var(--brick); }
-  .stat.sealed .value { color: var(--vault); }
-  .stat.sealed .dot { background: var(--vault); }
-  .harness-panel { border-top: 3px solid var(--vault); }
-  .harness { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  @media (max-width: 1250px) { .harness { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (max-width: 760px) { .harness { grid-template-columns: minmax(0, 1fr); } }
-  .layer { padding: 14px 16px 16px; border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .layer-head { display: flex; align-items: center; gap: 8px; }
-  .layer-head .n { width: 20px; height: 20px; border-radius: 50%; background: var(--vault); color: var(--panel); font: 600 11px/20px var(--mono); text-align: center; flex: none; }
-  .layer-head b { font-size: 13px; }
-  .layer .value { font-size: 15px; font-weight: 600; color: var(--vault); font-variant-numeric: tabular-nums; }
-  .layer .value.alert { color: var(--brick); }
-  .layer p { margin: 0; font-size: 12px; color: var(--soft); }
-  .layer .try { font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--hair); padding-top: 6px; margin-top: auto; }
-  .layer .try b { font-weight: 600; color: var(--soft); }
-  #probes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  @media (max-width: 900px) { #probes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .prove { border: 1px solid var(--vault); background: var(--vault); color: var(--panel); border-radius: 4px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
-  .prove:disabled { opacity: .5; cursor: default; }
-  .layer .prove { align-self: flex-start; margin-top: auto; }
-  .probe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 8px 16px; border-right: 1px solid var(--hair); font-size: 12.5px; align-items: baseline; }
-  .probe code { font: 12px/1.4 var(--mono); }
-  .probe .verdict { font: 600 10.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--vault); }
-  .probe .verdict.open { color: var(--brick); }
-  .probe small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; margin-top: -4px; }
+  .stat .name { font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .stat .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 4px; display: flex; align-items: center; gap: 8px; letter-spacing: -.01em; }
+  .stat .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat.warn .value { color: var(--warn); }
+  .stat.bad .value { color: var(--bad); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .stat.bad .dot { background: var(--bad); }
+  .stat.sealed .dot { background: var(--ok); }
 
-  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
   @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
-  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
-  .panel-head h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); min-height: 44px; flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
   .panel-head small { font-size: 12px; color: var(--muted); }
-  .mod { font: 600 10px/1 var(--mono); letter-spacing: .04em; color: var(--vault); background: var(--vault-tint); padding: 3px 5px; border-radius: 2px; white-space: nowrap; }
+
+  .guards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  @media (max-width: 1250px) { .guards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .guards { grid-template-columns: minmax(0, 1fr); } }
+  .guard { padding: 14px 16px; border-right: 1px solid var(--hair); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .guard:last-child { border-right: 0; }
+  .guard .idx { font: 500 11px/1 var(--mono); color: var(--muted); }
+  .guard b { font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .guard .value { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 6px; }
+  .guard .value.alert { color: var(--bad); }
+  .guard p { margin: 0; font-size: 12px; color: var(--muted); }
+  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .btn:hover { background: var(--bg); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.danger { color: var(--bad); }
+  #probes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+  #probes:empty { display: none; }
+  @media (max-width: 900px) { #probes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .probe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 16px; border-right: 1px solid var(--hair); font-size: 12.5px; align-items: center; }
+  .probe code { font: 12px/1.4 var(--mono); }
+  .probe small { grid-column: 1; color: var(--muted); font-size: 11.5px; }
+  .badge, .probe .verdict { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-tint); color: var(--ok); }
+  .probe .verdict { grid-row: 1 / span 2; grid-column: 2; }
+  .probe .verdict.open { background: var(--bad-tint); color: var(--bad); }
 
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11.5px; font-weight: 500; color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { text-align: left; font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--bg); }
   td { padding: 9px 10px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+  tbody tr:hover td { background: var(--bg); }
   tr:last-child td { border-bottom: 0; }
   th:first-child, td:first-child { padding-left: 16px; }
   th:last-child, td:last-child { padding-right: 16px; }
   th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
   td.n { font-family: var(--mono); font-size: 12.5px; }
-  .svc { font-weight: 600; }
+  .svc { font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
   .role { font-size: 12px; color: var(--muted); }
-  .pods { display: flex; align-items: center; gap: 4px; }
-  .pod { width: 11px; height: 11px; border-radius: 2px; background: var(--good); }
-  .pod.starting { background: var(--amber); }
-  .pod.terminating { background: var(--brick); }
-  .pods b { font-weight: 500; font-family: var(--mono); font-size: 12px; margin-left: 6px; }
+  .pods { display: flex; align-items: center; gap: 3px; }
+  .pod { width: 10px; height: 10px; border-radius: 2px; background: var(--ok); }
+  .pod.starting { background: var(--warn); }
+  .pod.terminating { background: var(--bad); }
+  .pods b { font-weight: 500; font-family: var(--mono); font-size: 12px; margin-left: 6px; color: var(--soft); }
   .scale { font-size: 12px; color: var(--soft); white-space: nowrap; }
-  .scale.up { color: var(--vault); font-weight: 600; }
-  .warn-text { color: var(--amber); font-weight: 600; }
+  .scale.up { color: var(--accent); font-weight: 600; }
+  .warn-text { color: var(--warn); font-weight: 600; }
   .zero { color: var(--muted); }
-  .platform { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--line); font-size: 12.5px; }
-  .platform .tag { color: var(--muted); }
+  .platform { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .platform b { color: var(--ink); font-weight: 600; }
 
-  .mechanisms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  @media (max-width: 1250px) { .mechanisms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 620px) { .mechanisms { grid-template-columns: minmax(0, 1fr); } }
-  .mech { padding: 12px 16px 14px; border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); min-width: 0; }
-  .mech-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .mech-head b { font-size: 12.5px; }
-  .mech .value { font-size: 17px; font-weight: 600; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
-  .mech.active .value { color: var(--vault); }
-  .mech.alert .value { color: var(--amber); }
-  .mech p { margin: 0; font-size: 12px; color: var(--muted); }
+  .promises td { vertical-align: top; }
+  .promises .num { font: 500 12px/1.5 var(--mono); color: var(--muted); width: 32px; }
+  .promises .name { font-weight: 600; white-space: nowrap; }
+  .promises .plain { color: var(--muted); font-size: 12.5px; }
+  .promises .now { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--soft); }
+  .promises .now.active { color: var(--accent); font-weight: 600; }
+  .promises .now.alert { color: var(--warn); font-weight: 600; }
+  .promises .drill { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .bonus { padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 
-  .action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--hair); }
+  .action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--hair); }
   .action:last-child { border-bottom: 0; }
-  .action b { font-weight: 600; }
+  .action b { font-weight: 600; font-size: 13px; }
   .action p { margin: 0; grid-column: 1; font-size: 12px; color: var(--muted); }
-  .action p .mod { margin-right: 6px; }
-  .action button { grid-row: 1 / span 2; grid-column: 2; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
-  .action button.danger { color: var(--brick); border-color: var(--brick); }
-  .action button:hover { background: var(--paper); }
-  .action button:disabled { opacity: .4; cursor: default; }
-  .notice { font-size: 12.5px; padding: 9px 16px; border-top: 1px solid var(--hair); color: var(--soft); }
-  .notice.error { color: var(--brick); }
+  .action button { grid-row: 1 / span 2; grid-column: 2; }
+  .notice { font-size: 12.5px; padding: 9px 16px; border-top: 1px solid var(--line); color: var(--soft); background: var(--bg); }
+  .notice.error { color: var(--bad); }
   .notice:empty { display: none; }
 
-  .tools a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 16px; border-bottom: 1px solid var(--hair); color: inherit; text-decoration: none; }
+  .tools a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; padding: 10px 16px; border-bottom: 1px solid var(--hair); color: inherit; }
   .tools a:last-child { border-bottom: 0; }
-  .tools a:hover { background: var(--paper); }
-  .tools b { font-weight: 600; color: var(--vault); }
+  .tools a:hover { background: var(--bg); text-decoration: none; }
+  .tools b { font-weight: 600; }
   .tools p { margin: 0; grid-column: 1; font-size: 12px; color: var(--muted); }
   .tools .arrow { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--muted); }
 
-  .timeline { max-height: 330px; overflow-y: auto; }
+  .timeline { max-height: 320px; overflow-y: auto; }
   .event { display: grid; grid-template-columns: 62px 8px minmax(0, 1fr); gap: 10px; padding: 7px 16px; border-bottom: 1px solid var(--hair); align-items: baseline; font-size: 12.5px; }
   .event time { color: var(--muted); font: 11.5px/1.4 var(--mono); }
   .event i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); align-self: center; }
-  .event.chaos i { background: var(--brick); } .event.heal i { background: var(--good); }
+  .event.chaos i { background: var(--bad); } .event.heal i { background: var(--ok); }
   .empty { padding: 14px 16px; color: var(--muted); font-size: 12.5px; }
   .incident { display: flex; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
   .incident:last-child { border-bottom: 0; }
-  .incident b { text-transform: uppercase; font: 600 11px/1.6 var(--mono); letter-spacing: .04em; margin-right: 8px; }
+  .incident b { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-right: 8px; padding: 1px 6px; border-radius: 4px; background: var(--warn-tint); color: var(--warn); }
 </style>
 </head>
 <body>
 <header class="top">
   <div class="top-inner">
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 30 30" aria-hidden="true"><rect x="1.5" y="1.5" width="27" height="27" rx="3" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.5"/><rect x="9" y="9" width="12" height="12" rx="1.5" fill="currentColor"/></svg>
-      <b>Antara</b><span>Operations</span>
-      <a href="/">Helpdesk →</a>
+      <svg width="20" height="20" viewBox="0 0 30 30" aria-hidden="true"><rect x="1.5" y="1.5" width="27" height="27" rx="3" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.5"/><rect x="9" y="9" width="12" height="12" rx="1.5" fill="currentColor"/></svg>
+      Antara
     </div>
+    <nav class="nav"><a href="/">Helpdesk</a><a href="/ops" class="current">Operations</a></nav>
+    <span class="env">local · k3s</span>
     <span id="live" class="live">Connecting</span>
     <select id="who" aria-label="Signed in as">
-      <option value="erin|operators">erin · operator</option>
-      <option value="carol|managers">carol · manager (no access)</option>
+      <option value="erin|operators">erin · Operator</option>
+      <option value="carol|managers">carol · Manager</option>
     </select>
   </div>
 </header>
 <main>
   <div id="denied" hidden></div>
   <div id="dashboard">
+  <div class="page-title"><h1>Overview</h1><span>Cluster health, AI guardrails and chaos experiments</span></div>
   <div class="health" id="health"></div>
-  <section class="panel harness-panel">
-    <div class="panel-head"><h2>AI harness</h2><small>Five controls in code, not in the prompt, wrap every answer. The small model is never trusted on its own.</small></div>
-    <div class="harness">
-      <div class="layer">
-        <div class="layer-head"><span class="n">1</span><b>Stays inside the network</b></div>
-        <div class="value" id="h-network">not checked yet</div>
-        <p>Default-deny egress policy. Each answer's trace lists every host it called.</p>
-        <button class="prove" id="prove" type="button">Prove it: try to reach outside AI services</button>
-      </div>
-      <div class="layer">
-        <div class="layer-head"><span class="n">2</span><b>Sees only what you may see</b></div>
-        <div class="value" id="h-access"></div>
-        <p>The vector search filters by the asker's groups before the model sees any passage.</p>
-        <div class="try"><b>Try:</b> as bob, click “API rate limits”. Nothing is found.</div>
-      </div>
-      <div class="layer">
-        <div class="layer-head"><span class="n">3</span><b>Answers only from sources</b></div>
-        <div class="value" id="h-grounded"></div>
-        <p>If no passage scores 0.6 or more, the model is never called. It says it could not find it.</p>
-        <div class="try"><b>Try:</b> ask “What is the parking policy?”</div>
-      </div>
-      <div class="layer">
-        <div class="layer-head"><span class="n">4</span><b>Filters what goes in and out</b></div>
-        <div class="value" id="h-filtered"></div>
-        <p>Injected instructions are stripped from passages. Secrets and requests for credentials never reach the user.</p>
-        <div class="try"><b>Try:</b> as dave, click “Signing key”. It comes back redacted.</div>
-      </div>
-      <div class="layer">
-        <div class="layer-head"><span class="n">5</span><b>Acts only with permission</b></div>
-        <div class="value" id="h-actions"></div>
-        <p>Tools only for action requests, checked against the group, approved by a manager, run once per key.</p>
-        <div class="try"><b>Try:</b> as alice, request prod database access. carol approves.</div>
-      </div>
+  <section class="panel">
+    <div class="panel-head"><h2>AI guardrails</h2><button class="btn" id="prove" type="button">Run egress check</button></div>
+    <div class="guards">
+      <div class="guard" title="A default-deny network policy blocks every connection out of the cluster; each answer's trace lists the hosts it called."><span class="idx">01</span><b>Network isolation</b><div class="value" id="h-network">Not checked</div><p>Default-deny egress policy</p></div>
+      <div class="guard" title="The vector search filters by the asker's groups before the model sees any passage."><span class="idx">02</span><b>Access control</b><div class="value" id="h-access"></div><p>Group filter inside vector search</p></div>
+      <div class="guard" title="If no passage scores 0.6 or more, the model is not called and the user is told nothing was found."><span class="idx">03</span><b>Grounding</b><div class="value" id="h-grounded"></div><p>Relevance threshold 0.6</p></div>
+      <div class="guard" title="Instructions injected into documents are stripped; secrets and requests for credentials are removed from answers."><span class="idx">04</span><b>Content filtering</b><div class="value" id="h-filtered"></div><p>Injection, secret and credential filters</p></div>
+      <div class="guard" title="Tools are offered only for action requests, checked against the user's group, approved by a manager and executed once per idempotency key."><span class="idx">05</span><b>Action control</b><div class="value" id="h-actions"></div><p>Approval and idempotency</p></div>
     </div>
     <div id="probes"></div>
   </section>
   <div class="grid">
     <div>
       <section class="panel">
-        <div class="panel-head"><h2>Services</h2><small>Workers pull tasks from their own Temporal queue. KEDA scales each one on its backlog.</small></div>
+        <div class="panel-head"><h2>Services</h2><small>Autoscaled by KEDA on queue backlog</small></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Service</th><th>Pods</th><th>Scaling</th><th class="n">Queued</th><th class="n">Tasks / s</th><th class="n">Restarts</th></tr></thead>
+            <thead><tr><th>Service</th><th>Pods</th><th>Scaling</th><th class="n">Queued</th><th class="n">Tasks/s</th><th class="n">Restarts</th></tr></thead>
             <tbody id="services"></tbody>
           </table>
         </div>
         <div class="platform" id="platform"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Distributed-systems mechanisms</h2><small>Live evidence for each mechanism · tags are course modules</small></div>
-        <div class="mechanisms" id="mechanisms"></div>
+        <div class="panel-head"><h2>Distributed-systems mechanisms</h2><small>Live</small></div>
+        <div class="table-wrap">
+          <table class="promises">
+            <thead><tr><th>#</th><th>Mechanism</th><th>Description</th><th>Status</th><th>Verified by</th></tr></thead>
+            <tbody id="mechanisms"></tbody>
+          </table>
+        </div>
+        <div class="bonus">Also: idempotent tool execution · expiring access grants · incident deduplication</div>
       </section>
     </div>
     <div>
       <section class="panel">
-        <div class="panel-head"><h2>Failure drills</h2><small id="chaos-state"></small></div>
+        <div class="panel-head"><h2>Chaos experiments</h2><small id="chaos-state"></small></div>
         <div id="chaos">
-          <div class="action"><b>Kill an agent worker</b><p><span class="mod">M7</span>The question in progress finishes on another pod.</p><button class="danger" data-action="kill" data-target="agent">Run</button></div>
-          <div class="action"><b>Kill an ingest worker</b><p><span class="mod">M5</span>Documents wait in the queue; none are lost.</p><button class="danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
-          <div class="action"><b>Take the model down for 30 s</b><p><span class="mod">M3</span>Calls retry with backoff, then succeed.</p><button class="danger" data-action="outage">Run</button></div>
-          <div class="action"><b id="gpu-title">Take the GPU lane down</b><p><span class="mod">M6</span>New documents embed on CPU after 20 s.</p><button class="danger" data-action="gpu">Run</button></div>
-          <div class="action"><b>Flood with traffic</b><p><span class="mod">M6</span>200 uploads, 50 questions: pods scale out, overload gets 429.</p><button class="danger" data-action="flood">Run</button></div>
-          <div class="action"><b>Corrupt a document's index</b><p><span class="mod">M8</span>The reconciler detects and repairs it within about 30 s.</p><button class="danger" data-action="corrupt">Run</button></div>
-          <div class="action"><b>Run the reconciler now</b><p><span class="mod">M4</span>Checks every document and repairs any that are stuck.</p><button data-action="reconcile">Run</button></div>
+          <div class="action"><b>Terminate agent pod</b><p>In-flight requests resume on another pod</p><button class="btn danger" data-action="kill" data-target="agent">Run</button></div>
+          <div class="action"><b>Terminate ingest pod</b><p>Queued documents are kept</p><button class="btn danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
+          <div class="action"><b>Model outage · 30 s</b><p>Calls retry with backoff</p><button class="btn danger" data-action="outage">Run</button></div>
+          <div class="action"><b id="gpu-title">Disable GPU lane</b><p>Embeddings fall back to CPU after 20 s</p><button class="btn danger" data-action="gpu">Run</button></div>
+          <div class="action"><b>Load test</b><p>200 uploads and 50 questions</p><button class="btn danger" data-action="flood">Run</button></div>
+          <div class="action"><b>Corrupt vector index</b><p>Reconciler repairs within ~30 s</p><button class="btn danger" data-action="corrupt">Run</button></div>
+          <div class="action"><b>Run reconciler</b><p>Repair stuck documents now</p><button class="btn" data-action="reconcile">Run</button></div>
         </div>
         <div id="notice" class="notice"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Observability</h2><small>Metrics, traces and workflow history, all in-cluster</small></div>
+        <div class="panel-head"><h2>Observability</h2></div>
         <div class="tools">
-          <a href="/grafana/d/antara-overview?refresh=5s" target="_blank" rel="noopener"><b>Grafana dashboard</b><p>Queue backlog, 429s by reason, model latency p95</p><span class="arrow">↗</span></a>
-          <a href="/jaeger/search?service=api" target="_blank" rel="noopener"><b>Jaeger traces</b><p>One request followed across API, Temporal, workers and model</p><span class="arrow">↗</span></a>
-          <a href="/temporal/namespaces/default/workflows?query=WorkflowType%20!%3D%20%22ReconcilerWorkflow%22" target="_blank" rel="noopener"><b>Temporal workflow history</b><p>Every durable run: retries, timers, signals, which pod ran each step</p><span class="arrow">↗</span></a>
-          <a href="/prometheus/graph?g0.expr=sum%20by%20(reason)%20(antara_api_rejected_total)&amp;g0.tab=0" target="_blank" rel="noopener"><b>Prometheus</b><p>Raw metrics scraped from every pod</p><span class="arrow">↗</span></a>
+          <a href="/grafana/d/antara-overview?refresh=5s" target="_blank" rel="noopener"><b>Grafana</b><p>Queue backlog, 429 rate, model latency</p><span class="arrow">↗</span></a>
+          <a href="/jaeger/search?service=api" target="_blank" rel="noopener"><b>Jaeger</b><p>Distributed traces</p><span class="arrow">↗</span></a>
+          <a href="/temporal/namespaces/default/workflows?query=WorkflowType%20!%3D%20%22ReconcilerWorkflow%22" target="_blank" rel="noopener"><b>Temporal</b><p>Workflow history (read-only)</p><span class="arrow">↗</span></a>
+          <a href="/prometheus/graph?g0.expr=sum%20by%20(reason)%20(antara_api_rejected_total)&amp;g0.tab=0" target="_blank" rel="noopener"><b>Prometheus</b><p>Raw metrics</p><span class="arrow">↗</span></a>
         </div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Activity</h2><small>Red: failure injected · Green: recovered</small></div>
+        <div class="panel-head"><h2>Event log</h2></div>
         <div class="timeline" id="timeline"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Open incidents</h2><small>Duplicate reports merge by affected system</small></div>
+        <div class="panel-head"><h2>Open incidents</h2></div>
         <div id="incidents"></div>
       </section>
     </div>
@@ -395,16 +380,18 @@ function lastEgressCheck(state) {
 
 function egressStat(state) {
   const check = lastEgressCheck(state);
-  if (!check) return stat("Internet access", "Not checked", "run the sovereignty check", "");
+  if (!check) return stat("Egress", "Not checked", "Run egress check", "");
   const sealed = check.blocked === check.total;
-  return stat("Internet access", sealed ? "Blocked" : "OPEN", `${check.blocked}/${check.total} outside AI services refused · ${ago(check.at)}`, sealed ? "sealed" : "bad", true);
+  return stat("Egress", sealed ? "Blocked" : "Open", `${check.blocked}/${check.total} external endpoints refused · ${ago(check.at)}`, sealed ? "sealed" : "bad", true);
 }
 
-function mechanism(title, modules, value, how, tone = "") {
-  return el("div", { class: `mech ${tone}` },
-    el("div", { class: "mech-head" }, el("b", {}, title), el("span", { class: "mod" }, modules)),
-    el("div", { class: "value" }, value),
-    el("p", {}, how));
+function promise(number, name, plain, now, prove, tone = "") {
+  return el("tr", {},
+    el("td", { class: "num" }, String(number)),
+    el("td", { class: "name" }, name),
+    el("td", { class: "plain" }, plain),
+    el("td", { class: `now ${tone}` }, now),
+    el("td", { class: "drill" }, prove));
 }
 
 function render(state) {
@@ -424,13 +411,13 @@ function render(state) {
   const restarts = state.pods.reduce((sum, pod) => sum + (pod.restarts || 0), 0);
 
   $("health").replaceChildren(
-    stat("Pods ready", `${s.pods_ready} / ${s.pods_total}`, "across all services", s.pods_ready < s.pods_total ? "warn" : ""),
-    stat("Queued tasks", s.backlog, "waiting for a worker", s.backlog > 20 ? "warn" : ""),
-    stat("Refused by API", apiRefused, "HTTP 429 since last restart", apiRefused ? "warn" : ""),
-    stat("Refused by model gateway", modelRefused, "HTTP 429 since last restart", modelRefused ? "warn" : ""),
+    stat("Pods ready", `${s.pods_ready} / ${s.pods_total}`, "All services", s.pods_ready < s.pods_total ? "warn" : ""),
+    stat("Queue backlog", s.backlog, "Tasks awaiting a worker", s.backlog > 20 ? "warn" : ""),
+    stat("API 429s", apiRefused, "Since last restart", apiRefused ? "warn" : ""),
+    stat("Gateway 429s", modelRefused, "Since last restart", modelRefused ? "warn" : ""),
     egressStat(state),
     stat("Model", verified === false ? "Unverified" : modelDown ? "Down" : "Healthy",
-      state.model.chaos ? "failure drill running" : verified === false ? `digest mismatch: ${state.model.models.unverified.join(", ")}` : verified ? "in-cluster · digests verified" : "served inside the cluster",
+      state.model.chaos ? "Outage in progress" : verified === false ? `Digest mismatch: ${state.model.models.unverified.join(", ")}` : verified ? "In-cluster · digests verified" : "In-cluster",
       modelDown ? "bad" : "", true),
   );
 
@@ -470,43 +457,39 @@ function render(state) {
   const docs = state.counts.documents || {};
   const reconcilerRuns = state.workflows.filter((workflow) => workflow.type === "ReconcilerWorkflow" && workflow.started);
   const lastReconcile = reconcilerRuns.length ? new Date(Math.max(...reconcilerRuns.map((run) => new Date(run.started).getTime()))) : null;
-  const reports = state.incidents.reduce((sum, incident) => sum + incident.reporters, 0);
   const gpuReady = readyCount("ingest-gpu");
   const scaledOut = SERVICES.filter((service) => service.max && (podsByApp.get(service.app) || []).length > 1).length;
   const egress = lastEgressCheck(state);
   const h = state.counts.harness || {};
   const sealed = egress && egress.blocked === egress.total;
-  $("h-network").textContent = egress ? `${egress.blocked}/${egress.total} outside AI services blocked` : "not checked yet";
+  $("h-network").textContent = egress ? `${egress.blocked}/${egress.total} endpoints blocked` : "Not checked";
   $("h-network").classList.toggle("alert", Boolean(egress && !sealed));
-  $("h-access").textContent = `${h.searches || 0} searches filtered by group`;
+  $("h-access").textContent = `${h.searches || 0} filtered searches`;
   $("h-grounded").textContent = `${h["answered-from-sources"] || 0} grounded · ${h["refused-ungrounded"] || 0} refused`;
-  $("h-filtered").textContent = `${h["secrets-redacted"] || 0} redacted · ${h["injection-stripped"] || 0} injections · ${h["unsafe-answer-blocked"] || 0} unsafe`;
-  $("h-actions").textContent = `${h.approvals || 0} approvals · ${h["tool-actions"] || 0} keyed actions`;
+  $("h-filtered").textContent = `${h["secrets-redacted"] || 0} redactions · ${h["injection-stripped"] || 0} injections`;
+  $("h-actions").textContent = `${h.approvals || 0} approvals · ${h["tool-actions"] || 0} actions`;
   $("mechanisms").replaceChildren(
-    mechanism("Asynchronous messaging", "M5", `${s.backlog} queued · 5 queues`,
-      "The API hands work to Temporal task queues and returns 202; workers process it later.", s.backlog ? "active" : ""),
-    mechanism("Independent scaling", "M6", SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),
-      "KEDA scales each worker type on its own queue backlog.", scaledOut ? "active" : ""),
-    mechanism("Load balancing", "M6", `${readyCount("api")} API replicas · ${busyPods} busy pod${busyPods === 1 ? "" : "s"}`,
-      "Workers pull tasks, so whichever pod is free takes the next one.", busyPods > 1 ? "active" : ""),
-    mechanism("Backpressure", "M4 · M6", `${apiRefused} API · ${modelRefused} model`,
-      "Overload is refused with 429 and Retry-After instead of queueing without limit.", apiRefused || modelRefused ? "alert" : ""),
-    mechanism("Retries with backoff", "M3 · M6", "chat ×6 · embedding ≤ 30 min",
-      "Backoff doubles from 2 s to 30 s. Corrupt files and permission errors are never retried."),
-    mechanism("Failure recovery", "M1 · M7", lastRecovery ? `${lastRecovery.app} back in ${lastRecovery.seconds} s` : `${restarts} restarts survived`,
-      "Durable workflows resume on another pod; heartbeats detect a dead worker in 30 s.", lastRecovery ? "active" : ""),
-    mechanism("Reliable messaging", "M5 · M9", `${state.counts.approvals_pending} awaiting approval · ${state.counts.approvals_escalated} escalated`,
-      "Approval signals wait durably in Temporal and survive worker restarts.", state.counts.approvals_pending ? "active" : ""),
-    mechanism("State reconciliation", "M4 · M8", lastReconcile ? `ran ${ago(lastReconcile)} · ${docs.PROCESSING || 0} stuck` : `${docs.PROCESSING || 0} stuck`,
-      "Every 30 s the reconciler re-runs stuck documents and rebuilds missing vectors."),
-    mechanism("Capability-aware scheduling", "M6", gpuReady ? `GPU lane up · ${queues.get("ingest-gpu")?.backlog ?? 0} queued` : "GPU lane down → CPU",
-      "Embeddings prefer the GPU lane; work not picked up in 20 s falls back to CPU.", gpuReady ? "" : "alert"),
-    mechanism("Effectively-once tools", "M5 · M9", `${state.counts.tickets} tickets · ${state.counts.access_grants} active grants`,
-      "Each tool call carries an idempotency key; a replay returns the stored result."),
-    mechanism("Saga with compensation", "M7 · M9", `${state.counts.leases_active ?? 0} lease${state.counts.leases_active === 1 ? "" : "s"} running`,
-      "Granted access is a lease; a durable timer runs the compensating revoke when it ends.", state.counts.leases_active ? "active" : ""),
-    mechanism("Fan-out / fan-in", "M5", `${reports} reports → ${state.incidents.length} incidents`,
-      "Duplicate outage reports merge into one incident per affected system.", reports > state.incidents.length ? "active" : ""),
+    promise(1, "Asynchronous messaging", "Requests are queued as durable workflows; the API returns 202 immediately.",
+      `${s.backlog} queued`, "Any request", s.backlog ? "active" : ""),
+    promise(2, "Independent scaling", "KEDA scales each worker type on its own queue backlog.",
+      SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),
+      "Load test", scaledOut ? "active" : ""),
+    promise(3, "Load balancing", "Pull-based workers and two API replicas.",
+      `${readyCount("api")} replicas · ${busyPods} busy`, "Load test", busyPods > 1 ? "active" : ""),
+    promise(4, "Backpressure", "HTTP 429 with Retry-After at the API and the model gateway.",
+      `${apiRefused + modelRefused} rejected`, "Load test", apiRefused || modelRefused ? "alert" : ""),
+    promise(5, "Reliable messaging", "Approval signals are persisted and survive worker restarts.",
+      `${state.counts.approvals_pending} pending`, "Access request", state.counts.approvals_pending ? "active" : ""),
+    promise(6, "Retries", "Exponential backoff: fast for chat, patient for ingestion.",
+      "2 s → 30 s", "Model outage"),
+    promise(7, "Failure recovery", "Interrupted workflows resume on another pod.",
+      lastRecovery ? `${lastRecovery.app} recovered in ${lastRecovery.seconds} s` : "No recent failure", "Terminate agent pod", lastRecovery ? "active" : ""),
+    promise(8, "State reconciliation", "Stuck and corrupted documents are repaired automatically.",
+      `${docs.PROCESSING || 0} stuck${lastReconcile ? ` · ${ago(lastReconcile)}` : ""}`, "Corrupt vector index"),
+    promise(9, "Distributed monitoring", "Traces, metrics and events across every service.",
+      `${s.pods_total} pods`, "Jaeger, Grafana"),
+    promise(10, "Capability-aware scheduling", "GPU lane first, CPU fallback after 20 s.",
+      gpuReady ? "GPU lane up" : "Fallback to CPU", "Disable GPU lane", gpuReady ? "" : "alert"),
   );
 
   $("incidents").replaceChildren(...(state.incidents.length ? state.incidents.map((incident) =>
@@ -517,7 +500,7 @@ function render(state) {
 
   $("timeline").replaceChildren(...(timeline.length ? timeline.map((item) =>
     el("div", { class: `event ${item.kind}` }, el("time", {}, clock(item.at)), el("i", {}), el("span", {}, item.text)))
-    : [el("div", { class: "empty" }, "Run a failure drill and watch the system recover here.")]));
+    : [el("div", { class: "empty" }, "No events yet.")]));
 
   $("chaos-state").textContent = state.chaos_enabled ? "" : "Disabled in this environment";
   for (const button of $("chaos").querySelectorAll("button")) {
@@ -543,15 +526,15 @@ async function refresh() {
 }
 
 const ACTIONS = {
-  kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Killed ${r.killed}. The console times how long the replacement takes.`),
-  outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "The model fails every call for the next 30 seconds. Ask a question in the helpdesk now."),
+  kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Terminated ${r.killed}. Measuring recovery…`),
+  outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "Model outage active for 30 s."),
   gpu: () => call("/ops/chaos/gpu-lane", { down: !gpuDown }).then((r) => {
     gpuDown = r.gpu_lane_down;
-    $("gpu-title").textContent = gpuDown ? "Restore the GPU lane" : "Take the GPU lane down";
-    return gpuDown ? "GPU lane is down. Upload a document to watch it fall back to CPU." : "GPU lane restored.";
+    $("gpu-title").textContent = gpuDown ? "Restore GPU lane" : "Disable GPU lane";
+    return gpuDown ? "GPU lane disabled. New embeddings fall back to CPU after 20 s." : "GPU lane restored.";
   }),
-  flood: () => call("/ops/chaos/flood", { documents: 200, questions: 50 }).then(() => "Flood running. Watch queued tasks, pods scaling and the 429 counts."),
-  corrupt: () => call("/ops/chaos/corrupt-index", {}).then((r) => `Corrupted ${r.title}. The reconciler repairs it within about 30 seconds.`),
+  flood: () => call("/ops/chaos/flood", { documents: 200, questions: 50 }).then(() => "Load test started: 200 uploads, 50 questions."),
+  corrupt: () => call("/ops/chaos/corrupt-index", {}).then((r) => `Index corrupted for ${r.title}. Awaiting reconciler repair.`),
   reconcile: () => call("/ops/reconcile", {}).then(() => "Reconciler started."),
 };
 
@@ -574,7 +557,7 @@ $("chaos").addEventListener("click", async (event) => {
 $("prove").addEventListener("click", async () => {
   const button = $("prove");
   button.disabled = true;
-  button.textContent = "Trying to connect from inside the cluster…";
+  button.textContent = "Checking…";
   try {
     const results = await call("/ops/egress-check", {});
     $("probes").replaceChildren(...results.map((result) => el("div", { class: "probe" },
@@ -585,7 +568,7 @@ $("prove").addEventListener("click", async () => {
     $("probes").replaceChildren(el("div", { class: "probe" }, el("span", {}, error.message)));
   } finally {
     button.disabled = false;
-    button.textContent = "Prove it: try to reach outside AI services";
+    button.textContent = "Run egress check";
     refresh();
   }
 });
