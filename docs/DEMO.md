@@ -6,12 +6,13 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 
 1. Mac plugged in, sleep off: `caffeinate -d` in a terminal.
 2. Cluster up: `colima start --cpu 8 --memory 12 && scripts/local-cluster.sh`, then `kubectl -n antara get pods` until all 19 are `1/1 Running`. The console's Cluster panel should show Node 1 and Node 2 both Ready.
-3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **55/55**. This also warms the model.
-4. Close leftover test incidents so the console starts clean:
+3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **62/62**. This also warms the model.
+4. Warm the answer cache: `scripts/warm.sh` asks every suggested question once as each demo user, so clicking a suggestion answers in under a second. It takes about 8 minutes from cold and lasts 24 hours; `--browse` also warms the Browse dropdown (about 20 minutes). It skips anything that would file a ticket, access request or incident.
+5. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
-5. Open both windows and hard-refresh (Cmd+Shift+R). On the console, click **Run egress check** once so "Egress: Blocked" shows.
-6. Open Grafana (`/grafana`) and Jaeger (`/jaeger`) in tabs.
-7. Keep a screen recording of a full run as a backup.
+6. Open both windows and hard-refresh (Cmd+Shift+R). On the console, click **Run egress check** once so "Egress: Blocked" shows.
+7. Open Grafana (`/grafana`) and Jaeger (`/jaeger`) in tabs.
+8. Keep a screen recording of a full run as a backup.
 
 ## Run of show
 
@@ -52,6 +53,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 | What happens if Postgres dies? | New work waits; nothing is lost, and after a full node restart everything resumed in 52 s. But availability is zero during the outage: it is a single point of failure locally. Production uses a synchronous standby: availability bought with write latency, as CAP and PACELC predict. |
 | What if every agent worker dies? | Show it: console **Stop all agent workers** → Run, then ask any question. Within ~10 s the helpdesk says the assistant is temporarily unavailable, the question is saved and will be answered automatically (it survives a page reload). The console shows a red banner: questions held in Temporal, why there are no workers, what happens next. Click **Restore agent workers**: the question is answered about 5 s after a worker starts, marked "waited N s during an outage", and the Event log records "worker back after N s". |
 | What if a whole machine dies? | Show it from a terminal: `scripts/local-cluster.sh stop-worker`. Node 2 turns red "Not responding" after ~40 s and its pods show ✕; requests keep working because Traefik retries on the copy on node 1 (measured: 1 failure in 65 requests). `scripts/local-cluster.sh start-worker` brings it back and rebalances. Losing node 1 would stop everything: the control plane and databases live there. |
+| Why are the suggested answers instant? | A semantic answer cache in Postgres: a question close enough to one already answered (cosine ≥ 0.95) returns the stored answer without calling the model. It is keyed by the asker's groups, so a contractor never gets an employee's cached answer, and an entry is dropped when a document it cites is deleted. A new question still takes 6–13 s on the CPU model. |
 | Is it exactly-once? | No: effectively-once. Activities are at-least-once; idempotency keys make repeated tool calls return the stored result, and two simultaneous approvals produced exactly one grant. |
 | How do you stop the model making things up? | If no permitted passage scores 0.6 or more, the model is never called. Every answer cites sources, and the eval suite checks 74 questions. |
 | Can a contractor see salaries? | No. The vector search filters by group inside the query; 12 eval cases check every sensitive fact as an unauthorised user. |
