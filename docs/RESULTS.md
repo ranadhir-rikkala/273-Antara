@@ -49,7 +49,7 @@ Every number below was measured live on the local cluster in Colima on an Apple 
 
 ## Answer latency
 
-Measured by the eval runner, which polls every 1.5 s, across the 46 demo questions:
+Measured by the eval runner, which polls every 1.5 s, across the demo questions:
 
 | Kind of answer | Time |
 | --- | --- |
@@ -61,11 +61,18 @@ Measured by the eval runner, which polls every 1.5 s, across the 46 demo questio
 
 | Suite | Result |
 | --- | --- |
-| Unit and workflow tests (business logic at 100% line coverage, enforced on every commit) | **173 passed** |
+| Unit and workflow tests (business logic at 100% line coverage, enforced on every commit) | **192 passed** |
 | Integration tests on real Postgres | **20 passed** |
-| Model evals | **28 / 28** |
-| Demo question suite | **46 / 46** |
+| Model evals | **26 / 28** (two known failures, see below) |
+| Demo question suite | **62 / 62** |
 | Coverage of all code, unit + integration | **78%** (wiring and entry points are exercised by the live suites above) |
+
+Known eval failures, both reproducible and both present before the two-node work (they fail the same way with the answer-length cap removed):
+
+| Case | What happens |
+| --- | --- |
+| `browser-extension-allowed` | The answer is right (“only from the approved list”) but the check expects the exact words “approved extension list” |
+| `apps-from-internet-says-no` | Asked as a contractor with the eval's fixture documents loaded, the model answers “Yes, you may…” although the policy says “No, you may not”. Asked without the fixtures it answers correctly |
 
 ## Security review (attacks replayed after the fixes)
 
