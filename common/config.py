@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:8088/v1"
     llm_model: str = "qwen2.5:7b-instruct"
     llm_temperature: float = 0.0
+    llm_max_tokens: int = 512
     embedding_model: str = "nomic-embed-text"
     embedding_dim: int = 768
     embedding_base_url: str = ""
