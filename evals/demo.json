@@ -716,5 +716,99 @@
         "security"
       ]
     }
+  },
+  {
+    "id": "chip-password-length-contractor",
+    "question": "How long does my password need to be?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "14"
+      ]
+    }
+  },
+  {
+    "id": "chip-report-phishing-contractor",
+    "question": "How do I report a phishing email?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "answer_contains_any": [
+        "Report Phishing",
+        "report phishing"
+      ],
+      "no_tools": true
+    }
+  },
+  {
+    "id": "chip-friday-deploy-contractor",
+    "question": "Can we deploy to production on a Friday afternoon?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "no",
+        "not"
+      ]
+    }
+  },
+  {
+    "id": "chip-sev2-response-contractor",
+    "question": "How quickly must on-call respond to a SEV2?",
+    "user": "bob",
+    "groups": "contractors",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "15 minutes"
+      ]
+    }
+  },
+  {
+    "id": "chip-vault-unseal",
+    "question": "How many key holders are needed to unseal the vault?",
+    "user": "dave",
+    "groups": "security-leads,employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "3 of the 5",
+        "3 of 5",
+        "three of the five",
+        "3 out of 5",
+        "three"
+      ]
+    }
+  },
+  {
+    "id": "chip-leaked-secret",
+    "question": "What is the procedure if a secret is leaked?",
+    "user": "dave",
+    "groups": "security-leads,employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "answer_contains_any": [
+        "15 minutes"
+      ],
+      "no_tools": true
+    }
+  },
+  {
+    "id": "chip-api-key-rotation",
+    "question": "How often are service API keys rotated?",
+    "user": "dave",
+    "groups": "security-leads,employees",
+    "expect": {
+      "status": "COMPLETED",
+      "answer_contains_any": [
+        "30 days"
+      ]
+    }
   }
 ]
