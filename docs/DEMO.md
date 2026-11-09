@@ -6,7 +6,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 
 1. Mac plugged in, sleep off: `caffeinate -d` in a terminal.
 2. Cluster up: `colima start --cpu 6 --memory 8 && docker start antara-k3s-k3s-1`, then `kubectl -n antara get pods` until all 17 are `1/1 Running`.
-3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **46/46**. This also warms the model.
+3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **55/55**. This also warms the model.
 4. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
 5. Open both windows and hard-refresh (Cmd+Shift+R). On the console, click **Run egress check** once so "Egress: Blocked" shows.
@@ -49,6 +49,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 | --- | --- |
 | Why Temporal and not Kafka or RabbitMQ? | Our hard parts are durable timers, waiting for approvals, retries and resuming half-finished work. Temporal gives those plus task queues with competing consumers and backlog-based scaling. Kafka would add an event log we do not need. See [DECISIONS.md](DECISIONS.md) §1. |
 | What happens if Postgres dies? | New work waits; nothing is lost, and after a full node restart everything resumed in 52 s. But availability is zero during the outage: it is a single point of failure locally. Production uses a synchronous standby: availability bought with write latency, as CAP and PACELC predict. |
+| What if every agent worker dies? | Show it: console **Stop all agent workers** → Run, then ask any question. The agent card turns red with "No pods running" and "1 question waiting for a worker"; the helpdesk keeps showing "Searching documents". Click **Restore agent workers**: the question is answered about 5 s after a worker starts. The workflow waited durably in Temporal, so nothing was lost. |
 | Is it exactly-once? | No: effectively-once. Activities are at-least-once; idempotency keys make repeated tool calls return the stored result, and two simultaneous approvals produced exactly one grant. |
 | How do you stop the model making things up? | If no permitted passage scores 0.6 or more, the model is never called. Every answer cites sources, and the eval suite checks 74 questions. |
 | Can a contractor see salaries? | No. The vector search filters by group inside the query; 12 eval cases check every sensitive fact as an unauthorised user. |

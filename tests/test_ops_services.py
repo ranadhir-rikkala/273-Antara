@@ -198,3 +198,11 @@ async def test_egress_check_names_any_outside_service_that_was_reachable() -> No
     await services.check_egress(Probe({"huggingface.co"}), store, "erin")
     detail = store.recorded[0][2]
     assert detail["reachable"] == ["huggingface.co"] and detail["blocked"] == detail["total"] - 1
+
+
+async def test_all_agent_workers_are_stopped_and_restored_through_keda() -> None:
+    cluster, store = Cluster(), Store()
+    await services.agent_workers(True, cluster, store, "erin")
+    await services.agent_workers(False, cluster, store, "erin")
+    assert cluster.paused == [("agent", 0), ("agent", None)]
+    assert [kind for kind, _, _ in store.recorded] == ["chaos.agent-workers-stopped", "chaos.agent-workers-restored"]

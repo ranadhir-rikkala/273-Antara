@@ -18,6 +18,7 @@ from common.queues import AGENT, INGEST_CPU, INGEST_GPU, RECONCILER, TOOLS
 QUEUES = (INGEST_CPU, INGEST_GPU, AGENT, TOOLS, RECONCILER)
 KILLABLE = ("agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "api", "gateway")
 GPU_LANE = "ingest-gpu"
+AGENT_WORKERS = "agent"
 OPERATOR_GROUP = "operators"
 MIN_OUTAGE_SECONDS, MAX_OUTAGE_SECONDS = 5, 300
 MAX_FLOOD_DOCS, MAX_FLOOD_QUESTIONS = 300, 100
@@ -134,6 +135,12 @@ async def model_outage(seconds: float, model: ModelControl, store: OpsStore, act
 async def gpu_lane(down: bool, cluster: Cluster, store: OpsStore, actor: str) -> None:
     await cluster.pause_scaling(GPU_LANE, 0 if down else None)
     await store.record("chaos.gpu-lane-down" if down else "chaos.gpu-lane-restored", actor, {"lane": GPU_LANE})
+
+
+async def agent_workers(down: bool, cluster: Cluster, store: OpsStore, actor: str) -> None:
+    await cluster.pause_scaling(AGENT_WORKERS, 0 if down else None)
+    kind = "chaos.agent-workers-stopped" if down else "chaos.agent-workers-restored"
+    await store.record(kind, actor, {"workers": AGENT_WORKERS})
 
 
 async def corrupt_index(store: OpsStore, actor: str) -> dict[str, Any]:

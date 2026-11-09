@@ -111,6 +111,14 @@ async def model_outage(
     return {"failing_for_seconds": body.seconds}
 
 
+@router.post("/chaos/agent-workers", status_code=202)
+async def agent_workers(
+    body: GpuLaneRequest, user: UserContext = Depends(chaos_operator), ops: PostgresOpsStore = Depends(store)
+) -> dict[str, bool]:
+    await _act(services.agent_workers(body.down, cluster(), ops, user.user_id))
+    return {"agent_workers_stopped": body.down}
+
+
 @router.post("/chaos/gpu-lane", status_code=202)
 async def gpu_lane(
     body: GpuLaneRequest, user: UserContext = Depends(chaos_operator), ops: PostgresOpsStore = Depends(store)

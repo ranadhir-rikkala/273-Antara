@@ -175,6 +175,7 @@
   .node-head b { font: 600 12.5px/1.3 var(--mono); }
   .node .role { font-size: 11.5px; color: var(--muted); }
   .node .stats { font-size: 11.5px; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .node .waiting { font-size: 11.5px; font-weight: 600; color: var(--warn); }
   .state { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--ok-tint); color: var(--ok); white-space: nowrap; }
   .state.scaling { background: var(--accent-tint); color: var(--accent); }
   .state.degraded { background: var(--warn-tint); color: var(--warn); }
@@ -253,6 +254,7 @@
         <div class="panel-head"><h2>Chaos experiments</h2><small id="chaos-state"></small></div>
         <div id="chaos">
           <div class="action"><b>Terminate agent pod</b><p>In-flight requests resume on another pod</p><button class="btn danger" data-action="kill" data-target="agent">Run</button></div>
+          <div class="action"><b id="agents-title">Stop all agent workers</b><p id="agents-hint">No worker answers; questions wait in the queue</p><button class="btn danger" data-action="agents">Run</button></div>
           <div class="action"><b>Terminate ingest pod</b><p>Queued documents are kept</p><button class="btn danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
           <div class="action"><b>Model outage · 30 s</b><p>Calls retry with backoff</p><button class="btn danger" data-action="outage">Run</button></div>
           <div class="action"><b id="gpu-title">Disable GPU lane</b><p>Embeddings fall back to CPU after 20 s</p><button class="btn danger" data-action="gpu">Run</button></div>
@@ -288,6 +290,7 @@ const $ = (id) => document.getElementById(id);
 const timeline = [];
 let previous = null;
 let gpuDown = false;
+let agentsDown = false;
 let lastOk = 0;
 const pendingKills = new Map();
 let lastRecovery = null;
@@ -350,6 +353,8 @@ function floodSummary(responses) {
 const EVENT_TEXT = {
   "chaos.kill-worker": (d) => [`Pod killed: ${d.pod}`, "chaos"],
   "chaos.model-outage": (d) => [`Model taken down for ${d.seconds} s`, "chaos"],
+  "chaos.agent-workers-stopped": () => ["All agent workers stopped", "chaos"],
+  "chaos.agent-workers-restored": () => ["Agent workers restored", "heal"],
   "chaos.gpu-lane-down": () => ["GPU lane taken down", "chaos"],
   "chaos.gpu-lane-restored": () => ["GPU lane restored", "heal"],
   "chaos.corrupt-index": (d) => [`Index corrupted: ${d.title} (${d.embeddings_deleted} vectors removed)`, "chaos"],
@@ -446,6 +451,7 @@ function mapNode(app, role, pods, extra = [], desired = 1) {
   const state = ready === 0 ? "down" : killed || pods.some((pod) => pod.terminating || !pod.ready) ? "degraded" : pods.length > desired ? "scaling" : "healthy";
   const label = { down: "Down", degraded: killed ? "Recovering" : "Degraded", scaling: "Scaled out", healthy: "Healthy" }[state];
   const row = el("div", { class: "podrow" }, ...squares);
+  if (!squares.length) row.append(el("span", { class: "podnote" }, "No pods running"));
   if (killed) row.append(el("span", { class: "podnote" }, "Killed"));
   return el("div", { class: `node ${state === "down" ? "down" : state === "degraded" ? "degraded" : ""}` },
     el("div", { class: "node-head" }, el("b", {}, app), el("span", { class: `state ${state}` }, label)),
@@ -457,8 +463,13 @@ function renderMap(state, podsByApp, queues, rates) {
   const pods = (app) => podsByApp.get(app) || [];
   const rate = (app) => pods(app).reduce((sum, pod) => sum + (rates[pod.name] || 0), 0);
   const backlog = (name) => { const q = queues.get(name); return q && !q.error ? q.backlog : 0; };
+  const questions = state.workflows.filter((workflow) => workflow.type === "AgentRunWorkflow" && workflow.status === "RUNNING").length;
+  const agentReady = pods("agent").some((pod) => pod.ready && !pod.terminating);
+  const waiting = (service) => service.app !== "agent" || !questions ? [] : [el("div", { class: agentReady ? "stats" : "waiting" },
+    `${questions} question${questions === 1 ? "" : "s"} ${agentReady ? "in progress" : "waiting for a worker"}`)];
   const worker = (service) => mapNode(service.app, service.role, pods(service.app), [
     el("div", { class: "stats" }, `queue ${backlog(service.queue)} · ${rate(service.app).toFixed(2)}/s${service.max ? ` · ${pods(service.app).length}/${service.max} pods` : ""}`),
+    ...waiting(service),
   ]);
   const maxBacklog = Math.max(10, ...state.queues.map((q) => q.backlog || 0));
   const busy = state.queues.some((q) => q.backlog) || Object.values(rates).some((r) => r >= 0.01);
@@ -591,6 +602,7 @@ async function refresh() {
     $("dashboard").hidden = false;
     absorb(state);
     render(state);
+    syncToggles(state);
     previous = state;
     lastOk = Date.now();
   } catch (error) {
@@ -601,7 +613,20 @@ async function refresh() {
   }
 }
 
+function syncToggles(state) {
+  const latest = (prefix) => state.events.find((event) => event.kind.startsWith(prefix))?.kind;
+  agentsDown = latest("chaos.agent-workers") === "chaos.agent-workers-stopped";
+  gpuDown = latest("chaos.gpu-lane") === "chaos.gpu-lane-down";
+  $("agents-title").textContent = agentsDown ? "Restore agent workers" : "Stop all agent workers";
+  $("agents-hint").textContent = agentsDown ? "Waiting questions are answered once workers return" : "No worker answers; questions wait in the queue";
+  $("gpu-title").textContent = gpuDown ? "Restore GPU lane" : "Disable GPU lane";
+}
+
 const ACTIONS = {
+  agents: () => call("/ops/chaos/agent-workers", { down: !agentsDown }).then((r) => {
+    agentsDown = r.agent_workers_stopped;
+    return agentsDown ? "All agent workers stopped. Questions will wait in the agent queue." : "Agent workers restored. Waiting questions will now be answered.";
+  }),
   kill: (button) => call("/ops/chaos/kill-worker", { target: button.dataset.target }).then((r) => `Terminated ${r.killed}. Measuring recovery…`),
   outage: () => call("/ops/chaos/model-outage", { seconds: 30 }).then(() => "Model outage active for 30 s."),
   gpu: () => call("/ops/chaos/gpu-lane", { down: !gpuDown }).then((r) => {
