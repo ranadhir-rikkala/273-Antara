@@ -15,6 +15,8 @@ PAUSE_ANNOTATION = "autoscaling.keda.sh/paused-replicas"
 RECONCILER_SCHEDULE = "antara-reconciler"
 CONTROL_PLANE_LABEL = "node-role.kubernetes.io/control-plane"
 RESTARTED_AT = "kubectl.kubernetes.io/restartedAt"
+SERVICE_LABEL = "antara/service"
+ROLE_LABEL = "antara/role"
 
 
 class ClusterUnavailableError(Exception):
@@ -24,9 +26,11 @@ class ClusterUnavailableError(Exception):
 def _pod_row(item: dict[str, Any]) -> dict[str, Any]:
     metadata, status = item["metadata"], item.get("status", {})
     containers = status.get("containerStatuses", [])
+    labels = metadata.get("labels", {})
     return {
         "name": metadata["name"],
-        "app": metadata.get("labels", {}).get("app", "?"),
+        "app": labels.get(SERVICE_LABEL) or labels.get("app", "?"),
+        "role": labels.get(ROLE_LABEL),
         "phase": status.get("phase", "Unknown"),
         "ready": bool(containers) and all(container.get("ready") for container in containers),
         "restarts": sum(container.get("restartCount", 0) for container in containers),

@@ -207,6 +207,7 @@
   .nodecard span { color: var(--muted); }
   .nodecard.drained { border-color: var(--warn); background: var(--warn-tint); }
   .nodecard.down { border-color: var(--bad); background: var(--bad-tint); }
+  .pod.standby { background: repeating-linear-gradient(135deg, var(--ok) 0 3px, var(--ok-tint) 3px 6px); animation: none; }
   .pod.spare { background: transparent; border: 1.5px dashed var(--muted); opacity: .4; box-sizing: border-box; animation: none; box-shadow: none; }
   .podrow .divider { width: 1px; height: 12px; background: var(--line); margin: 0 2px; }
   .metrics { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); }
@@ -258,7 +259,7 @@
   </section>
   <div class="grid stage">
     <section class="panel">
-      <div class="panel-head"><h2>Cluster</h2><div class="legend"><span><i class="pod"></i>Running</span><span><i class="pod starting"></i>Starting</span><span><i class="pod terminating"></i>Stopping or killed</span><span><i class="pod spare"></i>Room to scale (KEDA)</span></div></div>
+      <div class="panel-head"><h2>Cluster</h2><div class="legend"><span><i class="pod"></i>Running</span><span><i class="pod starting"></i>Starting</span><span><i class="pod terminating"></i>Stopping or killed</span><span><i class="pod standby"></i>Standby replica</span><span><i class="pod spare"></i>Room to scale (KEDA)</span></div></div>
       <div class="nodes" id="nodes"></div>
       <div class="map" id="map"></div>
     </section>
@@ -337,8 +338,8 @@ const SERVICES = [
   { app: "gateway", role: "Model gateway · caps concurrent model calls", scale: "fixed 1" },
   { app: "agent", role: "Answers questions", queue: "agent", min: 2, max: 4 },
   { app: "tools", role: "Tickets, access grants, approvals, leases", queue: "tools", min: 2, max: 3 },
-  { app: "ingest-cpu", role: "Reads and indexes documents", queue: "ingest-cpu", max: 4 },
-  { app: "ingest-gpu", role: "Embeds documents on the GPU lane", queue: "ingest-gpu", max: 2 },
+  { app: "ingest-cpu", role: "Reads and indexes documents", queue: "ingest-cpu", min: 2, max: 4 },
+  { app: "ingest-gpu", role: "Embeds documents on the GPU lane", queue: "ingest-gpu", min: 2, max: 2 },
   { app: "reconciler", role: "Finds and repairs broken documents", queue: "reconciler", scale: "fixed 1" },
 ];
 const SERVICE_APPS = new Set(SERVICES.map((service) => service.app));
@@ -528,8 +529,8 @@ function podSquares(app, pods) {
   const squares = pods.map((pod) => {
     const lost = nodeDown.has(pod.node);
     const attrs = {
-      class: `pod ${pod.terminating || lost ? "terminating" : pod.ready ? "" : "starting"}`,
-      title: `${pod.name} · ${lost ? "lost with its node" : pod.terminating ? "stopping" : pod.ready ? "running" : "starting"}${pod.node ? ` · node ${nodeIndex.get(pod.node) || "?"}` : ""} · ${pod.restarts} restarts`,
+      class: `pod ${pod.terminating || lost ? "terminating" : pod.ready ? (pod.role === "standby" ? "standby" : "") : "starting"}`,
+      title: `${pod.name}${pod.role ? ` · ${pod.role}` : ""} · ${lost ? "lost with its node" : pod.terminating ? "stopping" : pod.ready ? "running" : "starting"}${pod.node ? ` · node ${nodeIndex.get(pod.node) || "?"}` : ""} · ${pod.restarts} restarts`,
     };
     if (nodeIndex.size > 1 && nodeIndex.has(pod.node)) attrs["data-node"] = String(nodeIndex.get(pod.node));
     return el("span", attrs);
@@ -540,7 +541,7 @@ function podSquares(app, pods) {
   return { squares, killed: dead.length };
 }
 
-function mapNode(app, role, pods, extra = [], desired = 1, max = 0) {
+function mapNode(app, role, pods, extra = [], desired = 2, max = 0) {
   const { squares, killed } = podSquares(app, pods);
   const live = squares.length;
   const spare = Math.max(0, max - live);
@@ -552,6 +553,7 @@ function mapNode(app, role, pods, extra = [], desired = 1, max = 0) {
   const row = el("div", { class: "podrow" }, ...squares);
   if (!live) row.append(el("span", { class: "podnote" }, "No pods running"));
   else if (killed) row.append(el("span", { class: "podnote" }, "Killed"));
+  else if (pods.some((pod) => pod.role === "standby")) row.append(el("span", { class: "podinfo" }, `${ready} running · primary + standby`));
   else row.append(el("span", { class: "podinfo" }, `${ready} running${max ? ` \u00b7 ${desired > 1 ? `minimum ${desired}, ` : ""}up to ${max} when busy` : ready > 1 || desired > 1 ? " \u00b7 fixed" : ""}`));
   return el("div", { class: `node ${state === "down" ? "down" : state === "degraded" ? "degraded" : ""}` },
     el("div", { class: "node-head" }, el("b", {}, app), el("span", { class: `state ${state}` }, label)),
@@ -591,7 +593,7 @@ function renderMap(state, podsByApp, queues, rates) {
   const worker = (service) => mapNode(service.app, service.role, pods(service.app), [
     el("div", { class: "metrics" }, metric("Queued", backlog(service.queue)), metric("Throughput", `${rate(service.app).toFixed(2)}/s`)),
     ...waiting(service),
-  ], service.min || 1, service.max || 0);
+  ], service.min || 2, service.max || 0);
   const maxBacklog = Math.max(10, ...state.queues.map((q) => q.backlog || 0));
   const busy = state.queues.some((q) => q.backlog) || Object.values(rates).some((r) => r >= 0.01);
   const lane = () => el("div", { class: `lane ${busy ? "active" : ""}` });
