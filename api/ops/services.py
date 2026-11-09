@@ -19,6 +19,8 @@ QUEUES = (INGEST_CPU, INGEST_GPU, AGENT, TOOLS, RECONCILER)
 KILLABLE = ("agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "api", "gateway")
 GPU_LANE = "ingest-gpu"
 AGENT_WORKERS = "agent"
+REBALANCE = ("api", "agent", "tools", "ingest-cpu")
+STATELESS_OWNER = "ReplicaSet"
 OPERATOR_GROUP = "operators"
 MIN_OUTAGE_SECONDS, MAX_OUTAGE_SECONDS = 5, 300
 MAX_FLOOD_DOCS, MAX_FLOOD_QUESTIONS = 300, 100
@@ -75,8 +77,8 @@ async def snapshot(
         else {"name": name, "error": error}
         for name, (stats, error) in zip(QUEUES, queue_results, strict=True)
     ]
-    (pods, pods_error), (recent, workflows_error), (health, model_error) = await asyncio.gather(
-        _safe(cluster.pods()), _safe(workflows.recent(RECENT_WORKFLOWS)), _safe(model.health())
+    (pods, pods_error), (recent, workflows_error), (health, model_error), (nodes, _) = await asyncio.gather(
+        _safe(cluster.pods()), _safe(workflows.recent(RECENT_WORKFLOWS)), _safe(model.health()), _safe(cluster.nodes())
     )
     (rejected, _), (model_busy, _), (throughput, _) = await asyncio.gather(
         _safe(metrics.scalar(REJECTED_QUERY)),
@@ -91,6 +93,7 @@ async def snapshot(
         "summary": summarize(pods, queue_rows, recent, counts),
         "queues": queue_rows,
         "pods": pods,
+        "nodes": nodes or [],
         "workflows": recent,
         "model": health or {"ok": False},
         "metrics": {
@@ -141,6 +144,25 @@ async def agent_workers(down: bool, cluster: Cluster, store: OpsStore, actor: st
     await cluster.pause_scaling(AGENT_WORKERS, 0 if down else None)
     kind = "chaos.agent-workers-stopped" if down else "chaos.agent-workers-restored"
     await store.record(kind, actor, {"workers": AGENT_WORKERS})
+
+
+async def worker_node(down: bool, cluster: Cluster, store: OpsStore, actor: str) -> dict[str, Any]:
+    workers = [node["name"] for node in await cluster.nodes() if not node["control_plane"]]
+    if not workers:
+        raise NothingToBreakError("This cluster has no worker node")
+    node = workers[0]
+    await cluster.cordon(node, down)
+    if not down:
+        for deployment in REBALANCE:
+            await cluster.restart(deployment)
+        await store.record("chaos.node-restored", actor, {"node": node})
+        return {"node": node, "moved": []}
+    pods = await cluster.pods()
+    moved = [pod["name"] for pod in pods if pod.get("node") == node and pod.get("owner") == STATELESS_OWNER]
+    for name in moved:
+        await cluster.delete_pod(name)
+    await store.record("chaos.node-drained", actor, {"node": node, "moved": len(moved)})
+    return {"node": node, "moved": moved}
 
 
 async def corrupt_index(store: OpsStore, actor: str) -> dict[str, Any]:

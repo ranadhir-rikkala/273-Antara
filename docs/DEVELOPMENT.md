@@ -59,10 +59,12 @@ python -m loadtest.burst --docs 200 --questions 50 --concurrency 50
 
 ## Local Kubernetes (the demo setup, $0)
 
-Kubernetes runs inside Docker, so nothing extra is installed on your machine. Give Docker at least 6 CPUs and 8 GB first (Colima: `colima start --cpu 6 --memory 8`).
+Kubernetes runs inside Docker, so nothing extra is installed on your machine. Give Docker at least 8 CPUs and 12 GB first (Colima: `colima start --cpu 8 --memory 12`).
+
+The cluster has two k3s nodes. Node 1 is the control plane and holds everything with a disk (Postgres, Temporal, the object store, Ollama) plus monitoring. Node 2 is tainted for the app tier only: api, agent, tools and ingest-cpu run one copy on each node, so losing either node leaves a working copy of the request path. `scripts/local-cluster.sh` starts both nodes (and raises the VM's inotify limit, which two nodes need).
 
 ```bash
-docker compose -f deploy/local/docker-compose.yml up -d
+scripts/local-cluster.sh
 export KUBECONFIG=$PWD/deploy/local/.kube/kubeconfig.yaml
 kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.17.2/keda-2.17.2.yaml
 scripts/local-deploy.sh
@@ -75,6 +77,8 @@ scripts/local-deploy.sh
 Grafana, Jaeger, Prometheus and the Temporal UI are at `/grafana`, `/jaeger`, `/prometheus` and `/temporal`, with no login: anyone who can reach the app can read them, including every question and answer in the Temporal UI. The Temporal UI is read-only.
 
 Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only between pods in the namespace, to cluster DNS, and to the Kubernetes API on private addresses. Downloading the models is the one step that needs the internet, so it lifts the policy for the download and `scripts/local-deploy.sh` puts it back. Models stay on the Ollama volume afterwards.
+
+To crash node 2 for real, `scripts/local-cluster.sh stop-worker`; `scripts/local-cluster.sh start-worker` brings it back and rebalances the request path.
 
 The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
 

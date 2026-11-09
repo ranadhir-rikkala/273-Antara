@@ -5,7 +5,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 ## Pre-flight (30 minutes before)
 
 1. Mac plugged in, sleep off: `caffeinate -d` in a terminal.
-2. Cluster up: `colima start --cpu 6 --memory 8 && docker start antara-k3s-k3s-1`, then `kubectl -n antara get pods` until all 19 are `1/1 Running`.
+2. Cluster up: `colima start --cpu 8 --memory 12 && scripts/local-cluster.sh`, then `kubectl -n antara get pods` until all 19 are `1/1 Running`. The console's Cluster panel should show Node 1 and Node 2 both Ready.
 3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **55/55**. This also warms the model.
 4. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
@@ -24,12 +24,13 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 | 3:45 | **Secrets** | Switch to **dave**: click **Signing key**. | `[redacted]` and "Secret redacted" on the receipt. |
 | 4:15 | **Nothing leaves** | Console: **Run egress check**. Helpdesk: **View trace** on any answer. | 4/4 outside AI services blocked; the trace shows API → Temporal → agent → gateway → model, all internal. |
 | 5:15 | **Failure recovery** | Helpdesk (alice): ask *How long must my password be?* Immediately, console: **Terminate agent pod** → Run. | On the Cluster map the agent card turns red with a "Killed" pod and an amber replacement starting; it stays visible for 6 s. The answer still arrives, and the Failure recovery row shows "agent recovered in N s". (M1, M7) |
+| 5:45 | **Node failure** | Helpdesk: ask any question. Console: **Drain node 2** → Run. Then **Restore node 2**. | Node 2 turns amber "Drained"; the digits on the api, agent and tools squares change from 2 to 1 as the pods move; the answer still arrives. Restore puts one copy back on each node. "The request path runs one copy per node, so a machine can go away." (M3, M7) |
 | 6:30 | **Retries** | Console: **Model outage · 30 s** → Run. Helpdesk: ask *What disk encryption do we use on Macs?* | Health shows Model: Down, then Healthy. The answer arrives after the outage (~37 s). (M3, M6) |
 | 7:45 | **GPU lane** | Console: **Disable GPU lane** → Run. Helpdesk: **Upload document** (any small `.md`). Then **Restore GPU lane**. | The Event log shows the experiment; the document is READY in ~20 s via CPU. "Capability-aware scheduling: GPU first, CPU after 20 seconds." (M6) |
 | 9:00 | **Reconciliation** | Console: **Corrupt vector index** → Run. | Within ~30 s the Event log shows the repair; the State reconciliation row stays at 0 stuck. (M4, M8) |
 | 10:00 | **Lease revoked** | Console: Event log. | "The 3-minute lease from the start has ended: a durable timer revoked it. That timer survives even a full node restart; we measured it." (M7, M9) |
-| 10:30 | **Scale and backpressure** | Console: **Load test** → Run. Switch to the Grafana tab after 30 s. | Services table: ingest 1→4, agent 1→3 (KEDA). The API 429s and Gateway 429s figures climb: overload gets 429, not a crash. (M2, M3, M4, M6) |
-| 12:30 | **Close** | Show [SECURITY.md](SECURITY.md) or the slide. | OWASP LLM Top 10: 10/10. Measured results. Limits: single node and single databases locally; the production path is replicas. |
+| 10:30 | **Scale and backpressure** | Console: **Load test** → Run. Switch to the Grafana tab after 30 s. | Cluster map: the dashed slots fill as KEDA adds pods (ingest 1→4, agent 2→4). The API 429s and Gateway 429s figures climb: overload gets 429, not a crash. (M2, M3, M4, M6) |
+| 12:30 | **Close** | Show [SECURITY.md](SECURITY.md) or the slide. | OWASP LLM Top 10: 10/10. Measured results. Limits: the databases and the model live on node 1 only; the production path is a replicated database and nodes across zones. |
 
 **Optional finale (30 s):** turn off the Mac's Wi-Fi and ask one more question. It still answers.
 
@@ -50,6 +51,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 | Why Temporal and not Kafka or RabbitMQ? | Our hard parts are durable timers, waiting for approvals, retries and resuming half-finished work. Temporal gives those plus task queues with competing consumers and backlog-based scaling. Kafka would add an event log we do not need. See [DECISIONS.md](DECISIONS.md) §1. |
 | What happens if Postgres dies? | New work waits; nothing is lost, and after a full node restart everything resumed in 52 s. But availability is zero during the outage: it is a single point of failure locally. Production uses a synchronous standby: availability bought with write latency, as CAP and PACELC predict. |
 | What if every agent worker dies? | Show it: console **Stop all agent workers** → Run, then ask any question. Within ~10 s the helpdesk says the assistant is temporarily unavailable, the question is saved and will be answered automatically (it survives a page reload). The console shows a red banner: questions held in Temporal, why there are no workers, what happens next. Click **Restore agent workers**: the question is answered about 5 s after a worker starts, marked "waited N s during an outage", and the Event log records "worker back after N s". |
+| What if a whole machine dies? | Show it from a terminal: `scripts/local-cluster.sh stop-worker`. Node 2 turns red "Not responding" after ~40 s and its pods show ✕; requests keep working because Traefik retries on the copy on node 1 (measured: 1 failure in 65 requests). `scripts/local-cluster.sh start-worker` brings it back and rebalances. Losing node 1 would stop everything: the control plane and databases live there. |
 | Is it exactly-once? | No: effectively-once. Activities are at-least-once; idempotency keys make repeated tool calls return the stored result, and two simultaneous approvals produced exactly one grant. |
 | How do you stop the model making things up? | If no permitted passage scores 0.6 or more, the model is never called. Every answer cites sources, and the eval suite checks 74 questions. |
 | Can a contractor see salaries? | No. The vector search filters by group inside the query; 12 eval cases check every sensitive fact as an unauthorised user. |

@@ -119,6 +119,14 @@ async def agent_workers(
     return {"agent_workers_stopped": body.down}
 
 
+@router.post("/chaos/worker-node", status_code=202)
+async def worker_node(
+    body: GpuLaneRequest, user: UserContext = Depends(chaos_operator), ops: PostgresOpsStore = Depends(store)
+) -> dict[str, object]:
+    result = await _act(services.worker_node(body.down, cluster(), ops, user.user_id))
+    return {"worker_node_drained": body.down, **result}
+
+
 @router.post("/chaos/gpu-lane", status_code=202)
 async def gpu_lane(
     body: GpuLaneRequest, user: UserContext = Depends(chaos_operator), ops: PostgresOpsStore = Depends(store)

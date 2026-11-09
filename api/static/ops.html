@@ -198,6 +198,15 @@
   .pod.killed { opacity: .85; }
   .podnote { font-size: 11px; font-weight: 600; color: var(--bad); }
   .podinfo { font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+  .pod[data-node]::before { content: attr(data-node); position: absolute; inset: 0; color: #fff; font: 700 9px/14px var(--mono); text-align: center; }
+  .pod.terminating[data-node]::before { content: none; }
+  .nodes { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px 0; }
+  .nodecard { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; min-width: 0; }
+  .nodecard .num { width: 20px; height: 20px; border-radius: 5px; background: var(--ink); color: var(--panel); font: 700 11px/20px var(--mono); text-align: center; flex: none; }
+  .nodecard b { font-weight: 600; }
+  .nodecard span { color: var(--muted); }
+  .nodecard.drained { border-color: var(--warn); background: var(--warn-tint); }
+  .nodecard.down { border-color: var(--bad); background: var(--bad-tint); }
   .pod.spare { background: transparent; border: 1.5px dashed var(--muted); opacity: .4; box-sizing: border-box; animation: none; box-shadow: none; }
   .podrow .divider { width: 1px; height: 12px; background: var(--line); margin: 0 2px; }
   .metrics { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); }
@@ -250,6 +259,7 @@
   <div class="grid stage">
     <section class="panel">
       <div class="panel-head"><h2>Cluster</h2><div class="legend"><span><i class="pod"></i>Running</span><span><i class="pod starting"></i>Starting</span><span><i class="pod terminating"></i>Stopping or killed</span><span><i class="pod spare"></i>Room to scale (KEDA)</span></div></div>
+      <div class="nodes" id="nodes"></div>
       <div class="map" id="map"></div>
     </section>
     <div>
@@ -259,6 +269,7 @@
           <div class="group">Workers</div>
           <div class="action"><b>Terminate agent pod</b><p>In-flight requests resume on another pod</p><button class="btn danger" data-action="kill" data-target="agent">Run</button></div>
           <div class="action"><b id="agents-title">Stop all agent workers</b><p id="agents-hint">No worker answers; questions wait in the queue</p><button class="btn danger" data-action="agents">Run</button></div>
+          <div class="action" id="node-row"><b id="node-title">Drain node 2</b><p id="node-hint">Its pods move to node 1; requests keep flowing</p><button class="btn danger" data-action="node">Run</button></div>
           <div class="action"><b>Terminate ingest pod</b><p>Queued documents are kept</p><button class="btn danger" data-action="kill" data-target="ingest-cpu">Run</button></div>
           <div class="group">Dependencies</div>
           <div class="action"><b>Model outage · 30 s</b><p>Calls retry with backoff</p><button class="btn danger" data-action="outage">Run</button></div>
@@ -314,6 +325,7 @@ const timeline = [];
 let previous = null;
 let gpuDown = false;
 let agentsDown = false;
+let nodeDrained = false;
 const cooling = new Set();
 const COOLDOWN_MS = 2000;
 let lastOk = 0;
@@ -414,6 +426,8 @@ const EVENT_TEXT = {
   "chaos.model-outage": (d) => [`Model taken down for ${d.seconds} s`, "chaos"],
   "chaos.agent-workers-stopped": () => ["All agent workers stopped", "chaos"],
   "chaos.agent-workers-restored": () => ["Agent workers restored", "heal"],
+  "chaos.node-drained": (d) => [`Node 2 drained: ${d.moved} pods moved off it`, "chaos"],
+  "chaos.node-restored": () => ["Node 2 restored and request path rebalanced", "heal"],
   "chaos.gpu-lane-down": () => ["GPU lane taken down", "chaos"],
   "chaos.gpu-lane-restored": () => ["GPU lane restored", "heal"],
   "chaos.corrupt-index": (d) => [`Index corrupted: ${d.title} (${d.embeddings_deleted} vectors removed)`, "chaos"],
@@ -444,6 +458,11 @@ function absorb(state) {
   }
   firstLoad = false;
   if (!previous) return;
+  const wasReady = new Map((previous.nodes || []).map((node) => [node.name, node.ready]));
+  state.nodes.forEach((node, index) => {
+    if (wasReady.get(node.name) === true && !node.ready) note("chaos", `Node ${index + 1} stopped responding · its pods move after 20 s`);
+    if (wasReady.get(node.name) === false && node.ready) note("heal", `Node ${index + 1} is back`);
+  });
   if (agentReady(previous) && !agentReady(state)) {
     outageStarted = Date.now();
     note("chaos", "agent: no workers running \u00b7 new questions wait in the Temporal queue");
@@ -502,11 +521,19 @@ function egressStat(state) {
 const ghosts = new Map();
 const GHOST_MS = 6000;
 
+const nodeIndex = new Map();
+const nodeDown = new Set();
+
 function podSquares(app, pods) {
-  const squares = pods.map((pod) => el("span", {
-    class: `pod ${pod.terminating ? "terminating" : pod.ready ? "" : "starting"}`,
-    title: `${pod.name} · ${pod.terminating ? "stopping" : pod.ready ? "running" : "starting"} · ${pod.restarts} restarts`,
-  }));
+  const squares = pods.map((pod) => {
+    const lost = nodeDown.has(pod.node);
+    const attrs = {
+      class: `pod ${pod.terminating || lost ? "terminating" : pod.ready ? "" : "starting"}`,
+      title: `${pod.name} · ${lost ? "lost with its node" : pod.terminating ? "stopping" : pod.ready ? "running" : "starting"}${pod.node ? ` · node ${nodeIndex.get(pod.node) || "?"}` : ""} · ${pod.restarts} restarts`,
+    };
+    if (nodeIndex.size > 1 && nodeIndex.has(pod.node)) attrs["data-node"] = String(nodeIndex.get(pod.node));
+    return el("span", attrs);
+  });
   const now = Date.now();
   const dead = [...ghosts].filter(([, ghost]) => ghost.app === app && ghost.until > now);
   for (const [name] of dead) squares.push(el("span", { class: "pod killed", title: `${name} · killed` }));
@@ -519,7 +546,7 @@ function mapNode(app, role, pods, extra = [], desired = 1, max = 0) {
   const spare = Math.max(0, max - live);
   if (live && spare) squares.push(el("span", { class: "divider" }));
   for (let slot = 0; slot < spare; slot++) squares.push(el("span", { class: "pod spare", title: "Room to scale: KEDA adds a pod here when the queue backs up" }));
-  const ready = pods.filter((pod) => pod.ready && !pod.terminating).length;
+  const ready = pods.filter((pod) => pod.ready && !pod.terminating && !nodeDown.has(pod.node)).length;
   const state = ready === 0 ? "down" : killed || pods.some((pod) => pod.terminating || !pod.ready) ? "degraded" : pods.length > desired ? "scaling" : "healthy";
   const label = { down: "Down", degraded: killed ? "Recovering" : "Degraded", scaling: "Scaled out", healthy: "Healthy" }[state];
   const row = el("div", { class: "podrow" }, ...squares);
@@ -531,7 +558,27 @@ function mapNode(app, role, pods, extra = [], desired = 1, max = 0) {
     el("div", { class: "role" }, role), row, ...extra);
 }
 
+function renderNodes(state) {
+  nodeIndex.clear();
+  nodeDown.clear();
+  state.nodes.forEach((node, index) => {
+    nodeIndex.set(node.name, index + 1);
+    if (!node.ready) nodeDown.add(node.name);
+  });
+  $("nodes").hidden = state.nodes.length < 2;
+  $("nodes").replaceChildren(...state.nodes.map((node, index) => {
+    const count = node.ready ? state.pods.filter((pod) => pod.node === node.name && !pod.terminating).length : 0;
+    const status = !node.ready ? "down" : !node.schedulable ? "drained" : "";
+    const label = !node.ready ? "Not responding" : !node.schedulable ? "Drained" : "Ready";
+    const role = node.control_plane ? "Control plane · data · models" : "App workers";
+    return el("div", { class: `nodecard ${status}`, title: node.name },
+      el("span", { class: "num" }, String(index + 1)),
+      el("div", {}, el("b", {}, `Node ${index + 1} · ${label}`), el("div", {}, el("span", {}, `${role} · ${plural(count, "pod")}`))));
+  }));
+}
+
 function renderMap(state, podsByApp, queues, rates) {
+  renderNodes(state);
   if (state.errors.pods) { $("map").replaceChildren(el("div", { class: "empty" }, `Pods unavailable: ${state.errors.pods}`)); return; }
   const pods = (app) => podsByApp.get(app) || [];
   const rate = (app) => pods(app).reduce((sum, pod) => sum + (rates[pod.name] || 0), 0);
@@ -692,12 +739,20 @@ function syncToggles(state) {
   const latest = (prefix) => state.events.find((event) => event.kind.startsWith(prefix))?.kind;
   agentsDown = latest("chaos.agent-workers") === "chaos.agent-workers-stopped";
   gpuDown = latest("chaos.gpu-lane") === "chaos.gpu-lane-down";
+  nodeDrained = latest("chaos.node-") === "chaos.node-drained";
+  $("node-title").textContent = nodeDrained ? "Restore node 2" : "Drain node 2";
+  $("node-hint").textContent = nodeDrained ? "Uncordon and rebalance the request path" : "Its pods move to node 1; requests keep flowing";
+  $("node-row").hidden = state.nodes.length < 2;
   $("agents-title").textContent = agentsDown ? "Restore agent workers" : "Stop all agent workers";
   $("agents-hint").textContent = agentsDown ? "Waiting questions are answered once workers return" : "No worker answers; questions wait in the queue";
   $("gpu-title").textContent = gpuDown ? "Restore GPU lane" : "Disable GPU lane";
 }
 
 const ACTIONS = {
+  node: () => call("/ops/chaos/worker-node", { down: !nodeDrained }).then((r) => {
+    nodeDrained = r.worker_node_drained;
+    return nodeDrained ? `Node 2 drained: ${plural(r.moved.length, "pod")} moving to node 1.` : "Node 2 restored. The request path is rebalancing across both nodes.";
+  }),
   agents: () => call("/ops/chaos/agent-workers", { down: !agentsDown }).then((r) => {
     agentsDown = r.agent_workers_stopped;
     return agentsDown ? "All agent workers stopped. Questions will wait in the agent queue." : "Agent workers restored. Waiting questions will now be answered.";

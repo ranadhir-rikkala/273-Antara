@@ -36,9 +36,24 @@ class Cluster:
         )
         self.deleted: list[str] = []
         self.paused: list[tuple[str, int | None]] = []
+        self.nodes_list: list[dict[str, Any]] = [
+            {"name": "server", "ready": True, "schedulable": True, "control_plane": True},
+            {"name": "worker", "ready": True, "schedulable": True, "control_plane": False},
+        ]
+        self.cordoned: list[tuple[str, bool]] = []
+        self.restarted: list[str] = []
 
     async def pods(self) -> list[dict[str, Any]]:
         return self._pods
+
+    async def nodes(self) -> list[dict[str, Any]]:
+        return self.nodes_list
+
+    async def cordon(self, node: str, unschedulable: bool) -> None:
+        self.cordoned.append((node, unschedulable))
+
+    async def restart(self, deployment: str) -> None:
+        self.restarted.append(deployment)
 
     async def delete_pod(self, name: str) -> None:
         self.deleted.append(name)
@@ -115,6 +130,7 @@ async def test_snapshot_reports_each_section_and_survives_partial_failures() -> 
     assert state["metrics"] == {"rejected_429": 12.0, "model_busy_429": 12.0, "activities_per_second": {"agent-a": 0.5}}
     healthy = await services.snapshot(Queues(), Workflows(), Cluster(), Model(), Metrics(), Store())
     assert healthy["summary"]["workflows_running"] == 1 and healthy["errors"] == {}
+    assert [node["name"] for node in healthy["nodes"]] == ["server", "worker"]
 
 
 async def test_killing_a_worker_picks_a_ready_pod_and_records_it() -> None:
@@ -206,3 +222,32 @@ async def test_all_agent_workers_are_stopped_and_restored_through_keda() -> None
     await services.agent_workers(False, cluster, store, "erin")
     assert cluster.paused == [("agent", 0), ("agent", None)]
     assert [kind for kind, _, _ in store.recorded] == ["chaos.agent-workers-stopped", "chaos.agent-workers-restored"]
+
+
+async def test_draining_the_worker_node_cordons_it_and_moves_only_stateless_pods() -> None:
+    pods = [
+        {"name": "agent-a", "app": "agent", "node": "worker", "owner": "ReplicaSet"},
+        {"name": "agent-b", "app": "agent", "node": "server", "owner": "ReplicaSet"},
+        {"name": "app-db-0", "app": "app-db", "node": "worker", "owner": "StatefulSet"},
+        {"name": "api-a", "app": "api", "node": "worker", "owner": "ReplicaSet"},
+    ]
+    cluster, store = Cluster(pods), Store()
+    assert await services.worker_node(True, cluster, store, "erin") == {"node": "worker", "moved": ["agent-a", "api-a"]}
+    assert cluster.cordoned == [("worker", True)]
+    assert cluster.deleted == ["agent-a", "api-a"]
+    assert store.recorded == [("chaos.node-drained", "erin", {"node": "worker", "moved": 2})]
+
+
+async def test_restoring_the_worker_node_uncordons_it_and_rebalances_the_request_path() -> None:
+    cluster, store = Cluster(), Store()
+    assert await services.worker_node(False, cluster, store, "erin") == {"node": "worker", "moved": []}
+    assert cluster.cordoned == [("worker", False)]
+    assert cluster.restarted == ["api", "agent", "tools", "ingest-cpu"]
+    assert store.recorded == [("chaos.node-restored", "erin", {"node": "worker"})]
+
+
+async def test_a_single_node_cluster_has_no_worker_node_to_drain() -> None:
+    cluster = Cluster()
+    cluster.nodes_list = [{"name": "server", "ready": True, "schedulable": True, "control_plane": True}]
+    with pytest.raises(services.NothingToBreakError):
+        await services.worker_node(True, cluster, Store(), "erin")

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ SERVICE_ACCOUNT = Path("/var/run/secrets/kubernetes.io/serviceaccount")
 KUBERNETES_API = "https://kubernetes.default.svc"
 PAUSE_ANNOTATION = "autoscaling.keda.sh/paused-replicas"
 RECONCILER_SCHEDULE = "antara-reconciler"
+CONTROL_PLANE_LABEL = "node-role.kubernetes.io/control-plane"
+RESTARTED_AT = "kubectl.kubernetes.io/restartedAt"
 
 
 class ClusterUnavailableError(Exception):
@@ -28,6 +31,18 @@ def _pod_row(item: dict[str, Any]) -> dict[str, Any]:
         "restarts": sum(container.get("restartCount", 0) for container in containers),
         "terminating": "deletionTimestamp" in metadata,
         "started": metadata.get("creationTimestamp"),
+        "node": item.get("spec", {}).get("nodeName"),
+        "owner": next((owner["kind"] for owner in metadata.get("ownerReferences", [])), None),
+    }
+
+
+def _node_row(item: dict[str, Any]) -> dict[str, Any]:
+    conditions = item.get("status", {}).get("conditions", [])
+    return {
+        "name": item["metadata"]["name"],
+        "ready": any(c["type"] == "Ready" and c["status"] == "True" for c in conditions),
+        "schedulable": not item.get("spec", {}).get("unschedulable", False),
+        "control_plane": CONTROL_PLANE_LABEL in item["metadata"].get("labels", {}),
     }
 
 
@@ -63,6 +78,31 @@ class KubernetesCluster:
             response = await client.patch(
                 f"/apis/keda.sh/v1alpha1/namespaces/{self._namespace}/scaledobjects/{scaled_object}",
                 json={"metadata": {"annotations": {PAUSE_ANNOTATION: value}}},
+                headers={"Content-Type": "application/merge-patch+json"},
+            )
+        response.raise_for_status()
+
+    async def nodes(self) -> list[dict[str, Any]]:
+        async with self._client() as client:
+            response = await client.get("/api/v1/nodes")
+        items = response.raise_for_status().json()["items"]
+        return sorted((_node_row(item) for item in items), key=lambda node: (not node["control_plane"], node["name"]))
+
+    async def cordon(self, node: str, unschedulable: bool) -> None:
+        async with self._client() as client:
+            response = await client.patch(
+                f"/api/v1/nodes/{node}",
+                json={"spec": {"unschedulable": unschedulable}},
+                headers={"Content-Type": "application/merge-patch+json"},
+            )
+        response.raise_for_status()
+
+    async def restart(self, deployment: str) -> None:
+        stamp = datetime.now(UTC).isoformat()
+        async with self._client() as client:
+            response = await client.patch(
+                f"/apis/apps/v1/namespaces/{self._namespace}/deployments/{deployment}",
+                json={"spec": {"template": {"metadata": {"annotations": {RESTARTED_AT: stamp}}}}},
                 headers={"Content-Type": "application/merge-patch+json"},
             )
         response.raise_for_status()

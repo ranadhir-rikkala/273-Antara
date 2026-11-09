@@ -16,6 +16,10 @@ rules:
   - apiGroups: [keda.sh]
     resources: [scaledobjects]
     verbs: [get, patch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [api, agent, tools, ingest-cpu]
+    verbs: [get, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -23,5 +27,22 @@ metadata:
   name: antara-ops
   namespace: antara
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: antara-ops}
+subjects:
+  - {kind: ServiceAccount, name: antara-api, namespace: antara}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: antara-ops-nodes
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: antara-ops-nodes
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: antara-ops-nodes}
 subjects:
   - {kind: ServiceAccount, name: antara-api, namespace: antara}

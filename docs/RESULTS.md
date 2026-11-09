@@ -1,6 +1,6 @@
 # Measured results
 
-Every number below was measured live on the local cluster: one k3s node in Colima on an Apple Silicon Mac (6 CPUs, 8 GB), CPU-only inference with `qwen2.5:1.5b` and `nomic-embed-text`. Single runs unless stated; treat them as observed values, not benchmarks.
+Every number below was measured live on the local cluster in Colima on an Apple Silicon Mac: one k3s node (6 CPUs, 8 GB) until 2026-11-07, two nodes (8 CPUs, 12 GB) for the node rows, CPU-only inference with `qwen2.5:1.5b` and `nomic-embed-text`. Single runs unless stated; treat them as observed values, not benchmarks.
 
 ## Failure recovery
 
@@ -13,6 +13,9 @@ Every number below was measured live on the local cluster: one k3s node in Colim
 | One ingest pod drained and one force-killed during an 80-document flood | Drained pod finished its work; the killed pod's work was detected by heartbeat and retried elsewhere | All **80/80** READY in **100 s**; **2** heartbeat timeouts, **0** lost |
 | Same scenario before heartbeats and graceful shutdown | Work on a removed pod waited for the activity timeout | Documents stuck **5 min** |
 | Tools worker force-killed 8 s after an access grant | The lease's durable timer was picked up by the replacement | Access revoked at **exactly** its expiry |
+| Node 2 drained from the console while a question ran | Node cordoned; its 4 app pods deleted and recreated on node 1; restore rebalanced one copy per node | Node 2 empty in **~5 s**; question answered; balanced again in **~30 s** |
+| Node 2 hard-stopped (`docker stop`), before the edge retry | Requests sent to the dead api copy timed out until Kubernetes marked the node NotReady | Requests failing for **~35 s**; node NotReady at **40 s** |
+| Node 2 hard-stopped, with the edge retry (2 s connect timeout, 4 attempts) | Traefik retried on the surviving copy; replacements started on node 1 after the 20 s eviction delay | **1 / 65** requests failed, the rest in ≤ **2.2 s**; questions asked before and during the crash completed |
 | **Whole node restarted** with a pending approval and a running lease | Pods came back; state in Postgres and Temporal intact | Serving again in **52 s**; 21/21 documents intact; the pending request was approved afterwards and completed; the lease revoked on schedule |
 
 ## Scaling, load balancing and backpressure

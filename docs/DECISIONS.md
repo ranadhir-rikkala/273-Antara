@@ -34,11 +34,13 @@ Short records of the choices that shape Antara, what we gave up, and when we wou
 
 **Why.** Two-phase commit across Postgres, the object store and Temporal would block on the slowest participant and needs a coordinator that can fail mid-protocol. Idempotency keys make retries safe (effectively-once), and the reconciler repairs anything left half-done.
 
-## 5. Single node, single database: known single points of failure
+## 5. Two nodes, single databases: known single points of failure
 
-**Decision.** The local cluster runs one k3s node, one app database, one Temporal database and one model server.
+**Decision.** The local cluster runs two k3s nodes. The stateless request path (api, agent, tools, ingest-cpu) runs one copy on each node, enforced by a topology spread constraint, and Traefik retries a request on the other copy after a 2 s connect timeout. Everything with a disk stays on node 1: one app database, one Temporal database, one object store and one model server.
 
-**What fails.** If `app-db` or `temporal-db` stops, new work waits; nothing is lost, because Temporal and Postgres persist state, and the full-node restart test recovered in 52 s with every pending approval and timer intact. Availability during the outage, however, is zero.
+**Why not two of everything.** A second Postgres pod without replication is a second, different database. Real high availability for state needs a primary, a streaming replica and leader election for failover; that is the production path below, not something to fake with replica counts.
+
+**What fails.** Losing node 2 costs nothing visible: measured, 1 of 65 requests failed while Kubernetes noticed (40 s), and the missing copies restarted on node 1. Losing node 1 stops the whole system, because the control plane and every database live there. If `app-db` or `temporal-db` stops, new work waits; nothing is lost, because Temporal and Postgres persist state, and the full-node restart test recovered in 52 s with every pending approval and timer intact. Availability during the outage, however, is zero.
 
 **Production path.** Managed Postgres with a synchronous standby for both databases, Temporal Cloud or a multi-node Temporal cluster, at least two model servers behind the gateway, and nodes across availability zones. This trades latency for availability exactly as CAP and PACELC predict: synchronous replication costs a round trip on every write.
 
