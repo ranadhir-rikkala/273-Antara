@@ -48,11 +48,17 @@ metadata:
   name: temporal-ui
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: temporal-ui}}
   template:
     metadata: {labels: {app: temporal-ui}}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      topologySpreadConstraints:
+        - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: temporal-ui}}}
       enableServiceLinks: false
       containers:
         - name: ui

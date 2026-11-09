@@ -56,4 +56,13 @@ patches:
   - target: {kind: Deployment, name: ingest-gpu}
     patch: |-
       - {op: remove, path: /spec/template/spec/nodeSelector}
-      - {op: remove, path: /spec/template/spec/tolerations}
+      - op: replace
+        path: /spec/template/spec/tolerations
+        value:
+          - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+          - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+          - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: ingest-gpu}}}

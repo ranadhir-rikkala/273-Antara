@@ -5,7 +5,7 @@ metadata:
   namespace: antara
 spec:
   scaleTargetRef: {name: ingest-cpu}
-  minReplicaCount: 1
+  minReplicaCount: 2
   maxReplicaCount: 4
   pollingInterval: 5
   cooldownPeriod: 60
@@ -25,7 +25,7 @@ metadata:
   namespace: antara
 spec:
   scaleTargetRef: {name: ingest-gpu}
-  minReplicaCount: 1
+  minReplicaCount: 2
   maxReplicaCount: 2
   pollingInterval: 5
   cooldownPeriod: 60

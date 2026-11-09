@@ -68,11 +68,17 @@ metadata:
   name: prometheus
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: prometheus}}
   template:
     metadata: {labels: {app: prometheus}}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      topologySpreadConstraints:
+        - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: prometheus}}}
       serviceAccountName: prometheus
       containers:
         - name: prometheus
@@ -100,11 +106,17 @@ metadata:
   name: grafana
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: grafana}}
   template:
     metadata: {labels: {app: grafana}}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      topologySpreadConstraints:
+        - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: grafana}}}
       containers:
         - name: grafana
           image: grafana/grafana:11.3.0@sha256:a0f881232a6fb71a0554a47d0fe2203b6888fe77f4cefb7ea62bed7eb54e13c3

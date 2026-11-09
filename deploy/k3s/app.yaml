@@ -89,7 +89,7 @@ metadata:
   name: ingest-cpu
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: ingest-cpu}}
   template:
     metadata:
@@ -121,7 +121,7 @@ metadata:
   name: ingest-gpu
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: ingest-gpu}}
   template:
     metadata:
@@ -211,13 +211,19 @@ metadata:
   name: reconciler
   namespace: antara
 spec:
-  replicas: 1
+  replicas: 2
   selector: {matchLabels: {app: reconciler}}
   template:
     metadata:
       labels: {app: reconciler, antara/part: app}
       annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9464"}
     spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 20}
+      topologySpreadConstraints:
+        - {maxSkew: 1, topologyKey: kubernetes.io/hostname, whenUnsatisfiable: DoNotSchedule, nodeTaintsPolicy: Honor, matchLabelKeys: [pod-template-hash], labelSelector: {matchLabels: {app: reconciler}}}
       containers:
         - name: reconciler
           image: antara-app:dev
