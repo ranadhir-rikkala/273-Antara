@@ -14,8 +14,10 @@ class Description:
 class FakeHandle:
     def __init__(self, query=None, describe=None, result=None) -> None:
         self._query, self._describe, self._result = query, describe, result
+        self.query_timeout = None
 
-    async def query(self, name: str, result_type=None):
+    async def query(self, name: str, result_type=None, rpc_timeout=None):
+        self.query_timeout = rpc_timeout
         if isinstance(self._query, Exception):
             raise self._query
         return self._query
@@ -63,3 +65,10 @@ async def test_running_workflows_without_a_worker_are_temporarily_unavailable() 
     )
     with pytest.raises(RunUnavailableError):
         await read_run_state(handle)
+
+
+async def test_status_checks_give_up_quickly_when_no_worker_answers() -> None:
+    handle = FakeHandle(query=AgentRunState(status="RUNNING"))
+    await read_run_state(handle)
+    assert handle.query_timeout is not None
+    assert handle.query_timeout.total_seconds() <= 5

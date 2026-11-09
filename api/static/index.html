@@ -62,6 +62,10 @@
   .msg.bot .mark { width: 28px; height: 28px; border-radius: 6px; background: var(--accent-tint); color: var(--accent); display: grid; place-items: center; }
   .answer { white-space: pre-wrap; }
   .working { color: var(--muted); }
+  .unavailable { border-left: 3px solid var(--warn); background: var(--warn-tint); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .unavailable b { color: var(--warn); font-weight: 600; }
+  .unavailable p { margin: 0; color: var(--soft); }
+  .unavailable .waited { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .working::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
   @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
   @media (prefers-reduced-motion: reduce) { .working::after { animation: none; content: "..."; } }
@@ -394,7 +398,9 @@ async function api(path, options = {}) {
     const retry = response.headers.get("Retry-After");
     let detail = response.statusText;
     try { detail = (await response.json()).detail || detail; } catch (_) {}
-    throw new Error(response.status === 429 ? `Antara is busy: ${detail}. Try again in ${retry}s.` : detail);
+    const error = new Error(response.status === 429 ? `Antara is busy: ${detail}. Try again in ${retry}s.` : detail);
+    error.status = response.status;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
 }
@@ -456,6 +462,7 @@ function renderBot(node, state) {
   if (state.intent) meta.append(el("span", { class: "chip" }, state.intent));
   if (state.cached) meta.append(el("span", { class: "chip good" }, "from cache"));
   if (state.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
+  if (node.waited) meta.append(el("span", { class: "chip warn" }, `waited ${duration(node.askedAt)} during an outage`));
   if (state.needs_input) meta.append(el("span", { class: "chip warn" }, "needs details"));
   for (const flag of state.flags || []) meta.append(el("span", { class: "chip warn" }, `guard: ${flag.replaceAll("-", " ")}`));
   if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporter${state.incident.reporter_count === 1 ? "" : "s"}`));
@@ -547,16 +554,87 @@ async function showReceipt(node, state, traceId) {
   if (spans && traceLink) traceLink.textContent = `View trace · ${spans} spans ↗`;
 }
 
+const UNAVAILABLE_AFTER_MS = 5000;
+const PENDING_KEY = "antara.pending";
+const PENDING_TTL_MS = 24 * 3600 * 1000;
+
+function duration(since) {
+  const seconds = Math.max(0, Math.round((Date.now() - since) / 1000));
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+function showUnavailable(node) {
+  node.waited = true;
+  if (!node.notice) {
+    node.clock = el("span", {});
+    node.notice = el("div", { class: "unavailable", role: "status" },
+      el("b", {}, "The assistant is temporarily unavailable"),
+      el("p", {}, "Your question is saved and will be answered automatically as soon as the assistant is back. You don't need to ask again, and you can close this page; the answer will be here when you return."),
+      el("span", { class: "waited" }, "Waiting ", node.clock, " · for anything urgent, contact the IT service desk directly"));
+  }
+  node.clock.textContent = duration(node.askedAt);
+  node.ticker ??= setInterval(() => { node.clock.textContent = duration(node.askedAt); }, 1000);
+  node.body.replaceChildren(node.notice);
+}
+
+function stopTicker(node) {
+  clearInterval(node.ticker);
+  node.ticker = null;
+}
+
 async function poll(runId, node, traceId) {
-  for (let attempt = 0; attempt < 600; attempt++) {
+  let unavailableSince = null;
+  for (let attempt = 0; attempt < 2400; attempt++) {
     try {
       const state = await api(`/agent/runs/${runId}`);
+      unavailableSince = null;
+      stopTicker(node);
       renderBot(node, state);
       if (["WAITING_APPROVAL", "ESCALATED"].includes(state.status) && !node.receipt) showReceipt(node, state, traceId);
       $("chat").scrollTop = $("chat").scrollHeight;
       if (terminal.has(state.status)) return state;
-    } catch (_) {}
+    } catch (error) {
+      if (error.status === 404) { stopTicker(node); return null; }
+      if (error.status === 503) {
+        unavailableSince ??= Date.now();
+        if (Date.now() - unavailableSince >= UNAVAILABLE_AFTER_MS || node.waited) showUnavailable(node);
+      }
+    }
     await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+}
+
+function pendingRuns() {
+  try {
+    const runs = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+    return Array.isArray(runs) ? runs.filter((run) => Date.now() - run.asked < PENDING_TTL_MS) : [];
+  } catch (_) { return []; }
+}
+
+function savePending(runs) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(runs)); } catch (_) {}
+}
+
+function forgetRun(runId) {
+  savePending(pendingRuns().filter((run) => run.run_id !== runId));
+}
+
+async function follow(run, bot) {
+  bot.askedAt = run.asked;
+  const final = await poll(run.run_id, bot, run.trace_id);
+  forgetRun(run.run_id);
+  if (final === null) { bot.body.replaceChildren(el("div", { class: "answer" }, "This question is no longer available.")); return; }
+  if (final && final.answer) conversation.push({ question: run.question, answer: final.answer });
+  if (final) showReceipt(bot, final, run.trace_id);
+}
+
+function resumePending() {
+  const { user } = identity();
+  for (const run of pendingRuns().filter((item) => item.user === user)) {
+    $("chat").append(el("div", { class: "msg user" }, run.question));
+    const bot = botShell();
+    $("chat").append(bot);
+    follow(run, bot);
   }
 }
 
@@ -577,9 +655,9 @@ $("ask").addEventListener("submit", async (event) => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ question, history: conversation.slice(-3) }),
     });
-    const final = await poll(run_id, bot, trace_id);
-    if (final && final.answer) conversation.push({ question, answer: final.answer });
-    if (final) showReceipt(bot, final, trace_id);
+    const run = { run_id, trace_id, question, user: identity().user, asked: Date.now() };
+    savePending([...pendingRuns(), run]);
+    await follow(run, bot);
   } catch (error) {
     bot.remove();
     $("ask-error").textContent = error.message;
@@ -707,6 +785,7 @@ startAuth().then(() => {
   markClearance();
   loadDocs();
   loadInbox();
+  resumePending();
   setInterval(() => { loadDocs(); loadInbox(); }, 5000);
 });
 </script>

@@ -31,7 +31,7 @@ class Handle:
     def __init__(self, state: AgentRunState | None) -> None:
         self._state = state
 
-    async def query(self, name: str, result_type: object = None) -> AgentRunState:
+    async def query(self, name: str, result_type: object = None, rpc_timeout: object = None) -> AgentRunState:
         if self._state is None:
             raise RPCError("missing", RPCStatusCode.NOT_FOUND, b"")
         return self._state

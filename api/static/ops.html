@@ -48,6 +48,11 @@
   .page-title { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 0 16px; gap: 12px; flex-wrap: wrap; }
   .page-title h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
   .page-title span { color: var(--muted); font-size: 12.5px; }
+  .outage { border: 1px solid var(--bad); background: var(--bad-tint); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: grid; gap: 8px; }
+  .outage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .outage-head b { color: var(--bad); font-size: 14px; font-weight: 600; }
+  .outage-head span { color: var(--muted); font-size: 12.5px; }
+  .outage ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--soft); font-size: 12.5px; }
   #denied { padding: 10px 12px; background: var(--bad-tint); color: var(--bad); border-radius: 6px; margin-bottom: 16px; }
 
   .health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
@@ -220,6 +225,7 @@
   <div id="denied" hidden></div>
   <div id="dashboard">
   <div class="page-title"><h1>Overview</h1><span>Cluster health, AI guardrails and chaos experiments</span></div>
+  <div id="outage" class="outage" role="alert" hidden></div>
   <div class="health" id="health"></div>
   <section class="panel">
     <div class="panel-head"><h2>AI guardrails</h2><button class="btn" id="prove" type="button">Run egress check</button></div>
@@ -291,6 +297,8 @@ const timeline = [];
 let previous = null;
 let gpuDown = false;
 let agentsDown = false;
+const cooling = new Set();
+const COOLDOWN_MS = 2000;
 let lastOk = 0;
 const pendingKills = new Map();
 let lastRecovery = null;
@@ -340,6 +348,40 @@ function ago(date) {
   return seconds < 90 ? `${seconds} s ago` : `${Math.round(seconds / 60)} min ago`;
 }
 
+function waitingQuestions(state) {
+  return state.workflows.filter((workflow) => workflow.type === "AgentRunWorkflow" && workflow.status === "RUNNING");
+}
+
+function agentReady(state) {
+  return state.pods.some((pod) => pod.app === "agent" && pod.ready && !pod.terminating);
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function renderOutage(state) {
+  const box = $("outage");
+  if (state.errors.pods || agentReady(state)) { box.hidden = true; return; }
+  const waiting = waitingQuestions(state);
+  const oldest = waiting.map((workflow) => new Date(workflow.started)).sort((a, b) => a - b)[0];
+  const cause = agentsDown
+    ? "KEDA scaling is paused at 0 by the \u201cStop all agent workers\u201d experiment. Restore it to resume."
+    : "Kubernetes and KEDA are starting a replacement agent worker.";
+  box.replaceChildren(
+    el("div", { class: "outage-head" },
+      el("b", {}, `Agent service down \u00b7 ${plural(waiting.length, "question")} waiting`),
+      el("span", {}, oldest ? `Oldest asked ${ago(oldest)}` : "New questions will wait in the queue")),
+    el("ol", {},
+      el("li", {}, "Questions are held durably in Temporal\u2019s agent task queue. Nothing is lost, and nobody has to ask again."),
+      el("li", {}, "Helpdesk users are told the assistant is temporarily unavailable and their question is saved. Status checks return 503 within 4 s instead of hanging."),
+      el("li", {}, cause),
+      el("li", {}, "When a worker starts, it picks up every waiting question and answers it.")));
+  box.hidden = false;
+}
+
+let outageStarted = null;
+
 function note(kind, text, at = new Date()) {
   timeline.unshift({ kind, text, at });
   timeline.splice(60);
@@ -385,6 +427,15 @@ function absorb(state) {
   }
   firstLoad = false;
   if (!previous) return;
+  if (agentReady(previous) && !agentReady(state)) {
+    outageStarted = Date.now();
+    note("chaos", "agent: no workers running \u00b7 new questions wait in the Temporal queue");
+  }
+  if (!agentReady(previous) && agentReady(state)) {
+    const after = outageStarted ? ` after ${Math.round((Date.now() - outageStarted) / 1000)} s` : "";
+    note("heal", `agent: worker back${after} \u00b7 ${plural(waitingQuestions(state).length, "waiting question")} resuming`);
+    outageStarted = null;
+  }
   const before = new Map(previous.pods.map((pod) => [pod.name, pod]));
   const now = new Map(state.pods.map((pod) => [pod.name, pod]));
   for (const [name, pod] of now) {
@@ -557,7 +608,7 @@ function render(state) {
   $("h-actions").textContent = `${h.approvals || 0} approvals · ${h["tool-actions"] || 0} actions`;
   $("mechanisms").replaceChildren(
     promise(1, "Asynchronous messaging", "Requests are queued as durable workflows; the API returns 202 immediately.",
-      `${s.backlog} queued`, "Any request", s.backlog ? "active" : ""),
+      waitingQuestions(state).length && !agentReady(state) ? `${plural(waitingQuestions(state).length, "question")} held in queue` : `${s.backlog} queued`, "Any request", s.backlog || !agentReady(state) ? "active" : ""),
     promise(2, "Independent scaling", "KEDA scales each worker type on its own queue backlog.",
       SERVICES.filter((service) => service.max).map((service) => `${service.app.replace("ingest-", "")} ${(podsByApp.get(service.app) || []).length}/${service.max}`).join(" · "),
       "Load test", scaledOut ? "active" : ""),
@@ -591,7 +642,7 @@ function render(state) {
 
   $("chaos-state").textContent = state.chaos_enabled ? "" : "Disabled in this environment";
   for (const button of $("chaos").querySelectorAll("button")) {
-    if (button.dataset.action !== "reconcile") button.disabled = !state.chaos_enabled;
+    button.disabled = cooling.has(button) || (button.dataset.action !== "reconcile" && !state.chaos_enabled);
   }
 }
 
@@ -603,6 +654,7 @@ async function refresh() {
     absorb(state);
     render(state);
     syncToggles(state);
+    renderOutage(state);
     previous = state;
     lastOk = Date.now();
   } catch (error) {
@@ -641,7 +693,8 @@ const ACTIONS = {
 
 $("chaos").addEventListener("click", async (event) => {
   const button = event.target.closest("button");
-  if (!button) return;
+  if (!button || cooling.has(button)) return;
+  cooling.add(button);
   button.disabled = true;
   $("notice").className = "notice";
   try {
@@ -650,8 +703,8 @@ $("chaos").addEventListener("click", async (event) => {
     $("notice").className = "notice error";
     $("notice").textContent = error.message;
   } finally {
-    button.disabled = false;
-    refresh();
+    await refresh();
+    setTimeout(() => { cooling.delete(button); refresh(); }, COOLDOWN_MS);
   }
 });
 
