@@ -19,7 +19,20 @@ QUEUES = (INGEST_CPU, INGEST_GPU, AGENT, TOOLS, RECONCILER)
 KILLABLE = ("agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "api", "gateway")
 GPU_LANE = "ingest-gpu"
 AGENT_WORKERS = "agent"
-REBALANCE = ("api", "agent", "tools", "ingest-cpu")
+REBALANCE = (
+    "api",
+    "agent",
+    "tools",
+    "ingest-cpu",
+    "ingest-gpu",
+    "reconciler",
+    "gateway",
+    "temporal",
+    "temporal-ui",
+    "otel-collector",
+    "prometheus",
+    "grafana",
+)
 STATELESS_OWNER = "ReplicaSet"
 OPERATOR_GROUP = "operators"
 MIN_OUTAGE_SECONDS, MAX_OUTAGE_SECONDS = 5, 300

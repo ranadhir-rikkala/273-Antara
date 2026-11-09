@@ -20,7 +20,7 @@ case "${1:-up}" in
   start-worker)
     docker start antara-k3s-worker-1
     until kubectl get node antara-worker --no-headers 2>/dev/null | grep -q ' Ready'; do sleep 3; done
-    for name in api agent tools ingest-cpu; do
+    for name in api agent tools ingest-cpu ingest-gpu reconciler gateway temporal temporal-ui otel-collector prometheus grafana; do
       kubectl -n antara rollout restart "deploy/$name" >/dev/null
     done
     echo "Worker node back; request path rebalancing across both nodes"

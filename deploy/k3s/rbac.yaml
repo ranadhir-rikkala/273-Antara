@@ -18,7 +18,7 @@ rules:
     verbs: [get, patch]
   - apiGroups: [apps]
     resources: [deployments]
-    resourceNames: [api, agent, tools, ingest-cpu]
+    resourceNames: [api, agent, tools, ingest-cpu, ingest-gpu, reconciler, gateway, temporal, temporal-ui, otel-collector, prometheus, grafana]
     verbs: [get, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

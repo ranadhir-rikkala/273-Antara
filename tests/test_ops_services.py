@@ -242,7 +242,20 @@ async def test_restoring_the_worker_node_uncordons_it_and_rebalances_the_request
     cluster, store = Cluster(), Store()
     assert await services.worker_node(False, cluster, store, "erin") == {"node": "worker", "moved": []}
     assert cluster.cordoned == [("worker", False)]
-    assert cluster.restarted == ["api", "agent", "tools", "ingest-cpu"]
+    assert cluster.restarted == [
+        "api",
+        "agent",
+        "tools",
+        "ingest-cpu",
+        "ingest-gpu",
+        "reconciler",
+        "gateway",
+        "temporal",
+        "temporal-ui",
+        "otel-collector",
+        "prometheus",
+        "grafana",
+    ]
     assert store.recorded == [("chaos.node-restored", "erin", {"node": "worker"})]
 
 
