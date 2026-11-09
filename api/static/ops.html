@@ -200,13 +200,30 @@
   .podinfo { font-size: 11.5px; color: var(--muted); margin-left: 4px; }
   .pod[data-node]::before { content: attr(data-node); position: absolute; inset: 0; color: #fff; font: 700 9px/14px var(--mono); text-align: center; }
   .pod.terminating[data-node]::before { content: none; }
-  .nodes { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px 0; }
-  .nodecard { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; min-width: 0; }
-  .nodecard .num { width: 20px; height: 20px; border-radius: 5px; background: var(--ink); color: var(--panel); font: 700 11px/20px var(--mono); text-align: center; flex: none; }
-  .nodecard b { font-weight: 600; }
-  .nodecard span { color: var(--muted); }
-  .nodecard.drained { border-color: var(--warn); background: var(--warn-tint); }
+  .nodes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px 0; }
+  @media (max-width: 760px) { .nodes { grid-template-columns: minmax(0, 1fr); } }
+  .nodecard { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: grid; gap: 10px; padding: 12px 14px; min-width: 0; align-content: start; }
+  .nodecard-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+  .nodecard .num { grid-row: span 2; width: 34px; height: 34px; border-radius: 8px; background: var(--ink); color: var(--panel); font: 700 16px/34px var(--mono); text-align: center; }
+  .nodecard .title { font-size: 14px; font-weight: 600; }
+  .nodecard .meta { font-size: 12px; color: var(--muted); grid-column: 2; }
+  .nodecard .count { grid-row: span 2; text-align: right; font: 600 20px/1 var(--sans); font-variant-numeric: tabular-nums; }
+  .nodecard .count small { display: block; font: 500 11px/1.4 var(--sans); color: var(--muted); }
+  .nodecard .pill { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: 1px; background: var(--ok-tint); color: var(--ok); }
+  .nodecard.drained { border-color: var(--warn); }
+  .nodecard.drained .pill { background: var(--warn-tint); color: var(--warn); }
   .nodecard.down { border-color: var(--bad); background: var(--bad-tint); }
+  .nodecard.down .pill { background: var(--bad); color: var(--panel); }
+  .nodecard.down .num { background: var(--bad); }
+  .nchips { display: flex; flex-wrap: wrap; gap: 5px; align-items: flex-start; align-content: flex-start; border-top: 1px solid var(--hair); padding-top: 10px; }
+  .nchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 6px; font: 500 11px/1.2 var(--mono); color: var(--soft); background: var(--bg); }
+  .nchip i { width: 8px; height: 8px; border-radius: 2px; background: var(--ok); flex: none; }
+  .nchip.standby i { background: repeating-linear-gradient(135deg, var(--ok) 0 2px, var(--ok-tint) 2px 4px); }
+  .nchip.starting i { background: var(--warn); }
+  .nchip.lost { border-color: var(--bad); color: var(--bad); text-decoration: line-through; }
+  .nchip.lost i { background: var(--bad); }
+  .nchip .times { color: var(--muted); }
+  .nchips .empty-node { font-size: 12px; color: var(--muted); }
   .pod.standby { background: repeating-linear-gradient(135deg, var(--ok) 0 3px, var(--ok-tint) 3px 6px); animation: none; }
   .pod.spare { background: transparent; border: 1.5px dashed var(--muted); opacity: .4; box-sizing: border-box; animation: none; box-shadow: none; }
   .podrow .divider { width: 1px; height: 12px; background: var(--line); margin: 0 2px; }
@@ -523,6 +540,7 @@ const ghosts = new Map();
 const GHOST_MS = 6000;
 
 const nodeIndex = new Map();
+const NODE_ORDER = ["api", "gateway", "agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "temporal", "temporal-db", "app-db", "object-store", "ollama", "otel-collector", "jaeger", "prometheus", "grafana", "temporal-ui"];
 const nodeDown = new Set();
 
 function podSquares(app, pods) {
@@ -568,14 +586,29 @@ function renderNodes(state) {
     if (!node.ready) nodeDown.add(node.name);
   });
   $("nodes").hidden = state.nodes.length < 2;
+  const order = NODE_ORDER;
   $("nodes").replaceChildren(...state.nodes.map((node, index) => {
-    const count = node.ready ? state.pods.filter((pod) => pod.node === node.name && !pod.terminating).length : 0;
+    const here = state.pods.filter((pod) => pod.node === node.name && !pod.terminating);
     const status = !node.ready ? "down" : !node.schedulable ? "drained" : "";
     const label = !node.ready ? "Not responding" : !node.schedulable ? "Drained" : "Ready";
     const role = node.control_plane ? "Control plane · database primaries" : "Worker · database standbys";
+    const byApp = new Map();
+    for (const pod of here) byApp.set(pod.app, [...(byApp.get(pod.app) || []), pod]);
+    const apps = [...byApp.keys()].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) || a.localeCompare(b));
+    const chips = apps.map((app) => {
+      const list = byApp.get(app);
+      const tone = !node.ready ? "lost" : list.some((pod) => !pod.ready) ? "starting" : list.every((pod) => pod.role === "standby") ? "standby" : "";
+      const chip = el("span", { class: `nchip ${tone}`, title: list.map((pod) => `${pod.name}${pod.role ? ` (${pod.role})` : ""}`).join(", ") }, el("i", {}), app);
+      if (list.length > 1) chip.append(el("span", { class: "times" }, `×${list.length}`));
+      return chip;
+    });
     return el("div", { class: `nodecard ${status}`, title: node.name },
-      el("span", { class: "num" }, String(index + 1)),
-      el("div", {}, el("b", {}, `Node ${index + 1} · ${label}`), el("div", {}, el("span", {}, `${role} · ${plural(count, "pod")}`))));
+      el("div", { class: "nodecard-head" },
+        el("span", { class: "num" }, String(index + 1)),
+        el("div", { class: "title" }, `Node ${index + 1}`, el("span", { class: "pill" }, label)),
+        el("div", { class: "count" }, String(node.ready ? here.length : 0), el("small", {}, "pods")),
+        el("div", { class: "meta" }, `${role} · ${node.name}`)),
+      el("div", { class: "nchips" }, ...(chips.length ? chips : [el("span", { class: "empty-node" }, node.ready ? "No pods placed here" : "Its pods are being moved to the other node")])));
   }));
 }
 
