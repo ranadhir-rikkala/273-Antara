@@ -1,5 +1,7 @@
 from typing import Any
 
+from common.models import IncidentResult
+
 
 def summarize_tool_result(tool: str, output: dict[str, Any], approved_by: str | None = None) -> str:
     if tool == "create_ticket":
@@ -23,3 +25,14 @@ def describe_duration(seconds: int) -> str:
             count = seconds // size
             return f"{count} {unit}{'' if count == 1 else 's'}"
     return f"{seconds} seconds"
+
+
+def incident_message(incident: IncidentResult) -> str:
+    reference = f"INC-{incident.incident_id[:8]}"
+    if incident.created:
+        return f"I opened incident {reference} for this. The on-call team will follow up."
+    others = incident.reporter_count - 1
+    if others < 1:
+        return f"You already reported this in incident {reference} ({incident.title}). Updates will follow there."
+    people = "1 other person has" if others == 1 else f"{others} other people have"
+    return f"This matches incident {reference} ({incident.title}), which {people} reported. Updates will follow there."

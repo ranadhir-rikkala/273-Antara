@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ChildWorkflowError
 from temporalio.workflow import ParentClosePolicy
 
@@ -34,11 +35,13 @@ with workflow.unsafe.imports_passed_through():
 
 with workflow.unsafe.imports_passed_through():
     from agent.memory import contextual_query, recent
-    from agent.summary import summarize_tool_result
+    from agent.services import NOT_FOUND_ANSWER
+    from agent.summary import incident_message, summarize_tool_result
     from agent.tools import may_use
-    from agent.triage import tools_for
+    from agent.triage import asks_for_help, guidance_question, tools_for
 
 MAX_STEPS = 6
+GUIDANCE_RETRY = RetryPolicy(maximum_attempts=2)
 ESCALATE_AFTER = timedelta(minutes=2)
 EXPIRE_AFTER = timedelta(hours=24)
 APPROVED, DENIED, EXPIRED = "approved", "denied", "expired"
@@ -204,15 +207,37 @@ class AgentRunWorkflow:
             result_type=IncidentResult,
         )
         self._state.incident = incident
-        if incident.created:
-            self._state.answer = f"I opened incident {incident.incident_id} for this. The on-call team will follow up."
-        else:
-            self._state.answer = (
-                f"This matches open incident {incident.incident_id} ({incident.title}). "
-                f"You are one of {incident.reporter_count} people who reported it; updates will come there."
-            )
+        self._state.answer = incident_message(incident)
+        if asks_for_help(request.question):
+            await self._add_guidance(request)
         self._state.status = RunStatus.COMPLETED
         return self._state
+
+    async def _add_guidance(self, request: AgentRunRequest) -> None:
+        question = guidance_question(request.question)
+        try:
+            chunks = await workflow.execute_activity(
+                Activities.RETRIEVE,
+                RetrieveRequest(query=question, user=request.user),
+                result_type=list[ChunkResult],
+                task_queue=AGENT,
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=GUIDANCE_RETRY,
+            )
+            turn = await workflow.execute_activity(
+                Activities.GENERATE,
+                GenerateRequest(question=question, chunks=chunks, allow_tools=False),
+                result_type=ModelTurn,
+                task_queue=AGENT,
+                start_to_close_timeout=timedelta(minutes=3),
+                retry_policy=GUIDANCE_RETRY,
+            )
+        except ActivityError:
+            return
+        if turn.answer and turn.answer != NOT_FOUND_ANSWER:
+            self._state.answer = f"{turn.answer}\n\n{self._state.answer}"
+            self._state.citations = chunks
+            self._state.flags = turn.flags
 
     async def _await_approval(self, request: AgentRunRequest, call: ToolCall, step: int) -> str:
         run_id = workflow.info().workflow_id

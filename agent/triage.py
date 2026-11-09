@@ -28,6 +28,10 @@ OUTAGE = re.compile(
     r"|\b(very|really|so) slow\b"
 )
 
+HELP_REQUEST = re.compile(
+    r"\?|\b(what (should|do|can) i|what to do|what now|what next|how (do|can|to)|can i|should i|help|workaround)\b"
+)
+
 QUESTION_START = re.compile(r"^\s*(how|what|who|when|where|why|which|should|does|do)\b")
 
 BROKEN_DEVICE = re.compile(
@@ -96,6 +100,8 @@ def affected_system(text: str) -> str | None:
 
 def needs_model(text: str, by_rules: Intent) -> bool:
     lowered = f" {text.lower()} "
+    if QUESTION_START.match(lowered):
+        return False
     return by_rules == Intent.QUESTION and any(marker in lowered for marker in REQUEST_MARKERS)
 
 
@@ -110,3 +116,33 @@ def tools_for(text: str) -> list[str] | None:
 def parse_intent(reply: str) -> Intent | None:
     word = reply.strip().strip(".").lower()
     return Intent(word) if word in {intent.value for intent in Intent} else None
+
+
+def asks_for_help(text: str) -> bool:
+    return bool(HELP_REQUEST.search(text.lower()))
+
+
+SYSTEM_NAMES = {
+    "vpn": "the VPN",
+    "email": "email",
+    "wifi": "the Wi-Fi",
+    "sso": "single sign-on",
+    "printer": "the printer",
+    "internet": "the internet",
+    "slack": "Slack",
+    "jira": "Jira",
+    "database": "the database",
+}
+
+
+def guidance_question(text: str) -> str:
+    system = affected_system(text)
+    if system is None or not OUTAGE.search(text.lower()):
+        return text
+    return f"What should I do if {SYSTEM_NAMES[system]} is down?"
+
+
+def incident_system(text: str) -> str | None:
+    if SECURITY_THREAT.search(text.lower()):
+        return "security"
+    return affected_system(text)

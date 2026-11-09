@@ -244,6 +244,21 @@ async def test_incident_reports_go_to_dedup_child_workflow_not_rag() -> None:
     assert incident_reports == ["agent-vpn-1", "agent-vpn-2"]
 
 
+async def test_an_incident_that_asks_what_to_do_also_gets_an_answer_from_the_documents() -> None:
+    incident_reports.clear()
+    retrievals.clear()
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        agent_worker, tools_worker = _workers(env)
+        async with agent_worker, tools_worker:
+            plain = await (await _run(env, "agent-vpn-3", "The VPN is down for me")).result()
+            asking = await (await _run(env, "agent-vpn-4", "The VPN is down for me, what should I do?")).result()
+    assert plain.citations == [] and retrievals == ["What should I do if the VPN is down?"]
+    assert asking.intent == "incident" and asking.incident is not None
+    assert asking.answer.startswith("Done [1]")
+    assert asking.answer.endswith("Updates will follow there.") and "INC-incident" in asking.answer
+    assert asking.citations[0].document_id == "doc-1"
+
+
 async def test_repeated_question_is_served_from_cache() -> None:
     cache.clear()
     retrievals.clear()

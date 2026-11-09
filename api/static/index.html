@@ -439,7 +439,7 @@ function renderBot(node, state) {
   if (state.escalated) meta.append(el("span", { class: "chip warn" }, "escalated"));
   if (state.needs_input) meta.append(el("span", { class: "chip warn" }, "needs details"));
   for (const flag of state.flags || []) meta.append(el("span", { class: "chip warn" }, `guard: ${flag.replaceAll("-", " ")}`));
-  if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporters`));
+  if (state.incident) meta.append(el("span", { class: "chip warn" }, `incident · ${state.incident.reporter_count} reporter${state.incident.reporter_count === 1 ? "" : "s"}`));
   for (const result of state.tool_results || []) meta.append(el("span", { class: "chip" }, `tool ${result.status.toLowerCase()}`));
   body.append(meta);
   const citations = state.citations || [];
@@ -472,7 +472,7 @@ function harnessChecks(state, groups) {
   const flags = state.flags || [];
   const strong = (state.citations || []).filter((cite) => cite.score >= STRONG_MATCH).length;
   const refused = (state.answer || "").startsWith(REFUSED);
-  const searched = state.intent !== "incident";
+  const searched = state.intent !== "incident" || (state.citations || []).length > 0;
   const tools = state.tool_results || [];
   const access = searched
     ? ["ok", state.cached ? `Cached answer for ${groups} only` : `Searched only what ${groups} may read`]

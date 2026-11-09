@@ -602,5 +602,42 @@
     "expect": {
       "http": 422
     }
+  },
+  {
+    "id": "outage-with-question",
+    "question": "The VPN is down for me since this morning, what should I do?",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "incident": true,
+      "answer_contains_any": [
+        "status page"
+      ]
+    }
+  },
+  {
+    "id": "outage-short-ask",
+    "question": "vpn down what to do",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "incident": true,
+      "answer_starts_with": "if the vpn is down"
+    }
+  },
+  {
+    "id": "email-outage-workaround",
+    "question": "email down any workaround",
+    "user": "alice",
+    "groups": "employees",
+    "expect": {
+      "status": "COMPLETED",
+      "incident": true,
+      "answer_contains_any": [
+        "webmail"
+      ]
+    }
   }
 ]

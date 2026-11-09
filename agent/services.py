@@ -13,7 +13,7 @@ from agent.ports import (
     ToolUnitOfWork,
 )
 from agent.tools import HANDLERS, REGISTRY, clarifying_question, prepare_arguments, schemas
-from agent.triage import CLASSIFY_PROMPT, affected_system, classify_by_rules, needs_model, parse_intent
+from agent.triage import CLASSIFY_PROMPT, classify_by_rules, incident_system, needs_model, parse_intent
 from common.models import (
     ApprovalOpenRequest,
     CachedAnswer,
@@ -209,7 +209,7 @@ async def report_incident(
         existing = await workspace.find_report(report.report_id)
         if existing is not None:
             return existing
-        system = affected_system(report.text)
+        system = incident_system(report.text)
         if system is not None:
             match = await workspace.find_open_for_system(system, window_minutes)
         else:
