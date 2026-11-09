@@ -572,7 +572,7 @@ function renderNodes(state) {
     const count = node.ready ? state.pods.filter((pod) => pod.node === node.name && !pod.terminating).length : 0;
     const status = !node.ready ? "down" : !node.schedulable ? "drained" : "";
     const label = !node.ready ? "Not responding" : !node.schedulable ? "Drained" : "Ready";
-    const role = node.control_plane ? "Control plane · data · models" : "App workers";
+    const role = node.control_plane ? "Control plane · database primaries" : "Worker · database standbys";
     return el("div", { class: `nodecard ${status}`, title: node.name },
       el("span", { class: "num" }, String(index + 1)),
       el("div", {}, el("b", {}, `Node ${index + 1} · ${label}`), el("div", {}, el("span", {}, `${role} · ${plural(count, "pod")}`))));
@@ -599,7 +599,7 @@ function renderMap(state, podsByApp, queues, rates) {
   const lane = () => el("div", { class: `lane ${busy ? "active" : ""}` });
   const col = (label, ...nodes) => el("div", { class: "col" }, el("span", { class: "label" }, label), ...nodes);
   const byApp = new Map(SERVICES.map((service) => [service.app, service]));
-  const obs = ["prometheus", "grafana", "jaeger", "temporal-ui"].map((app) => {
+  const obs = ["otel-collector", "jaeger", "prometheus", "grafana", "temporal-ui"].map((app) => {
     const { squares } = podSquares(app, pods(app));
     return el("span", { class: "chipnode" }, ...squares, app);
   });
