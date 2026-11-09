@@ -5,7 +5,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 ## Pre-flight (30 minutes before)
 
 1. Mac plugged in, sleep off: `caffeinate -d` in a terminal.
-2. Cluster up: `colima start --cpu 6 --memory 8 && docker start antara-k3s-k3s-1`, then `kubectl -n antara get pods` until all 17 are `1/1 Running`.
+2. Cluster up: `colima start --cpu 6 --memory 8 && docker start antara-k3s-k3s-1`, then `kubectl -n antara get pods` until all 19 are `1/1 Running`.
 3. Warm up and verify: `python -m evals.run --cases evals/demo.json` must print **55/55**. This also warms the model.
 4. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
