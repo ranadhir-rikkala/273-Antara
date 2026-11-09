@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     max_inflight_requests: int = 64
 
     gateway_url: str = "http://gateway:8080"
+    gateway_pods_url: str = "http://gateway-pods:8080"
     prometheus_url: str = "http://prometheus:9090"
     jaeger_query_url: str = "http://jaeger:16686/jaeger"
     model_catalog_url: str = ""

@@ -88,7 +88,7 @@ async def state(client: Client = Depends(temporal), ops: PostgresOpsStore = Depe
         TemporalQueueInspector(client),
         TemporalWorkflows(client),
         cluster(),
-        GatewayModelControl(settings.gateway_url),
+        GatewayModelControl(settings.gateway_pods_url),
         PrometheusMetrics(settings.prometheus_url),
         ops,
     )
@@ -107,7 +107,7 @@ async def kill_worker(
 async def model_outage(
     body: OutageRequest, user: UserContext = Depends(chaos_operator), ops: PostgresOpsStore = Depends(store)
 ) -> dict[str, float]:
-    await _act(services.model_outage(body.seconds, GatewayModelControl(settings.gateway_url), ops, user.user_id))
+    await _act(services.model_outage(body.seconds, GatewayModelControl(settings.gateway_pods_url), ops, user.user_id))
     return {"failing_for_seconds": body.seconds}
 
 

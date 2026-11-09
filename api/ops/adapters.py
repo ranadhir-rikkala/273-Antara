@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -138,16 +139,37 @@ class TemporalReconcilerTrigger:
 
 
 class GatewayModelControl:
-    def __init__(self, base_url: str) -> None:
-        self._base_url = base_url
+    def __init__(self, pods_url: str) -> None:
+        url = httpx.URL(pods_url)
+        self._host, self._port = url.host, url.port or 80
+
+    async def _copies(self) -> list[str]:
+        infos = await asyncio.get_running_loop().getaddrinfo(self._host, self._port, type=socket.SOCK_STREAM)
+        addresses = sorted({info[4][0] for info in infos})
+        if not addresses:
+            raise ClusterUnavailableError(f"No gateway copies behind {self._host}")
+        return [f"http://{address}:{self._port}" for address in addresses]
 
     async def health(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(base_url=self._base_url, timeout=5) as client:
-            return (await client.get("/healthz")).raise_for_status().json()
+        copies = await self._copies()
+        async with httpx.AsyncClient(timeout=5) as client:
+            replies = await asyncio.gather(*(client.get(f"{copy}/healthz") for copy in copies))
+        bodies = [reply.raise_for_status().json() for reply in replies]
+        return {
+            **bodies[0],
+            "ok": all(body.get("ok") for body in bodies),
+            "chaos": any(body.get("chaos") for body in bodies),
+            "copies": len(bodies),
+        }
 
     async def fail_for(self, seconds: float) -> None:
-        async with httpx.AsyncClient(base_url=self._base_url, timeout=5) as client:
-            (await client.post("/admin/chaos", json={"fail_seconds": seconds})).raise_for_status()
+        copies = await self._copies()
+        async with httpx.AsyncClient(timeout=5) as client:
+            replies = await asyncio.gather(
+                *(client.post(f"{copy}/admin/chaos", json={"fail_seconds": seconds}) for copy in copies)
+            )
+        for reply in replies:
+            reply.raise_for_status()
 
 
 class PrometheusMetrics:
