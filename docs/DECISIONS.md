@@ -34,15 +34,24 @@ Short records of the choices that shape Antara, what we gave up, and when we wou
 
 **Why.** Two-phase commit across Postgres, the object store and Temporal would block on the slowest participant and needs a coordinator that can fail mid-protocol. Idempotency keys make retries safe (effectively-once), and the reconciler repairs anything left half-done.
 
-## 5. Two nodes, single databases: known single points of failure
+## 5. Two nodes, two copies of every service
 
-**Decision.** The local cluster runs two k3s nodes. The stateless request path (api, agent, tools, ingest-cpu) runs one copy on each node, enforced by a topology spread constraint, and Traefik retries a request on the other copy after a 2 s connect timeout. Everything with a disk stays on node 1: one app database, one Temporal database, one object store and one model server.
+**Decision.** The local cluster runs two k3s nodes and every one of the 17 services runs exactly one copy on each node (34 pods). How the second copy works depends on whether the service keeps state:
 
-**Why not two of everything.** A second Postgres pod without replication is a second, different database. Real high availability for state needs a primary, a streaming replica and leader election for failover; that is the production path below, not something to fake with replica counts.
+| Kind | Services | Second copy |
+| --- | --- | --- |
+| Stateless | api, agent, tools, ingest, reconciler, gateway, collectors, monitoring, Temporal UI | Active/active: both serve; a topology spread rule keeps one per node |
+| Workflow engine | temporal | Two servers form one cluster; history shards move to the survivor |
+| Databases | app-db, temporal-db | Primary on node 1 streams WAL to a hot standby on node 2 through a replication slot |
+| Object store | object-store | Primary on node 1; a replica on node 2 follows it with `filer.sync` |
+| Model server | ollama | Active/standby: the gateway sends every call to the primary and fails over to the standby after a 2 s connect timeout |
+| Traces | jaeger | Two collectors fan every span out to both Jaegers |
 
-**What fails.** Losing node 2 costs nothing visible: measured, 1 of 65 requests failed while Kubernetes noticed (40 s), and the missing copies restarted on node 1. Losing node 1 stops the whole system, because the control plane and every database live there. If `app-db` or `temporal-db` stops, new work waits; nothing is lost, because Temporal and Postgres persist state, and the full-node restart test recovered in 52 s with every pending approval and timer intact. Availability during the outage, however, is zero.
+**Why not active/active for everything.** A second database pod without replication is a second, different database, so state is replicated by protocol. The model server is active/standby because both nodes share the laptop's 8 CPUs: with both copies serving, four concurrent questions took 265 to 311 s and one failed; with one active copy they took 20 to 40 s.
 
-**Production path.** Managed Postgres with a synchronous standby for both databases, Temporal Cloud or a multi-node Temporal cluster, at least two model servers behind the gateway, and nodes across availability zones. This trades latency for availability exactly as CAP and PACELC predict: synchronous replication costs a round trip on every write.
+**What fails.** Losing node 2 costs nothing visible: measured, 91 of 91 page requests succeeded during a cold crash, and questions kept being answered. Losing node 1 is still an outage: it holds the Kubernetes control plane and the database primaries, and promoting a standby is a manual step (`pg_ctl promote`), not an automatic failover.
+
+**Production path.** Managed Postgres with a synchronous standby and automatic failover, a Temporal cluster across zones, model servers on separate GPU nodes so both copies can serve, and nodes across availability zones. Synchronous replication costs a round trip on every write, which is the latency-for-availability trade that CAP and PACELC describe.
 
 ## 6. Pull-based workers and per-queue scaling
 

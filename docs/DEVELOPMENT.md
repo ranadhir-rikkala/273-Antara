@@ -59,9 +59,9 @@ python -m loadtest.burst --docs 200 --questions 50 --concurrency 50
 
 ## Local Kubernetes (the demo setup, $0)
 
-Kubernetes runs inside Docker, so nothing extra is installed on your machine. Give Docker at least 8 CPUs and 12 GB first (Colima: `colima start --cpu 8 --memory 12`).
+Kubernetes runs inside Docker, so nothing extra is installed on your machine. Give Docker at least 8 CPUs and 16 GB first (Colima: `colima start --cpu 8 --memory 16`).
 
-The cluster has two k3s nodes. Node 1 is the control plane and holds everything with a disk (Postgres, Temporal, the object store, Ollama) plus monitoring. Node 2 is tainted for the app tier only: api, agent, tools and ingest-cpu run one copy on each node, so losing either node leaves a working copy of the request path. `scripts/local-cluster.sh` starts both nodes (and raises the VM's inotify limit, which two nodes need).
+The cluster has two k3s nodes and every service runs one copy on each (34 pods): stateless services serve from both, the databases and object store run a primary on node 1 with a streaming standby on node 2, Temporal runs two clustered servers, and Ollama runs a primary and a standby behind the gateway. See [DECISIONS.md](DECISIONS.md) §5. Node 2 is tainted so only Antara's own pods run there. `scripts/local-cluster.sh` starts both nodes (and raises the VM's inotify limit, which two nodes need).
 
 ```bash
 scripts/local-cluster.sh
@@ -69,8 +69,7 @@ export KUBECONFIG=$PWD/deploy/local/.kube/kubeconfig.yaml
 kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.17.2/keda-2.17.2.yaml
 scripts/local-deploy.sh
 kubectl -n antara delete networkpolicy default-deny
-kubectl -n antara exec deploy/ollama -- ollama pull qwen2.5:1.5b
-kubectl -n antara exec deploy/ollama -- ollama pull nomic-embed-text
+for pod in ollama-0 ollama-1; do kubectl -n antara exec $pod -- ollama pull qwen2.5:1.5b; kubectl -n antara exec $pod -- ollama pull nomic-embed-text; done
 scripts/local-deploy.sh
 ```
 
