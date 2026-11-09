@@ -584,6 +584,7 @@ function summarize(grid, verdict) {
 }
 
 const UNAVAILABLE_AFTER_MS = 5000;
+const FAST_POLLS = 40;
 const PENDING_KEY = "antara.pending";
 const PENDING_TTL_MS = 24 * 3600 * 1000;
 
@@ -629,7 +630,7 @@ async function poll(runId, node, traceId) {
         if (Date.now() - unavailableSince >= UNAVAILABLE_AFTER_MS || node.waited) showUnavailable(node);
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, attempt < FAST_POLLS ? 500 : 1500));
   }
 }
 
