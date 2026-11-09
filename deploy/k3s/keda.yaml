@@ -45,8 +45,8 @@ metadata:
   namespace: antara
 spec:
   scaleTargetRef: {name: agent}
-  minReplicaCount: 1
-  maxReplicaCount: 3
+  minReplicaCount: 2
+  maxReplicaCount: 4
   pollingInterval: 5
   cooldownPeriod: 60
   triggers:
@@ -65,7 +65,7 @@ metadata:
   namespace: antara
 spec:
   scaleTargetRef: {name: tools}
-  minReplicaCount: 1
+  minReplicaCount: 2
   maxReplicaCount: 3
   pollingInterval: 5
   cooldownPeriod: 60
