@@ -107,7 +107,7 @@
   .check { padding: 8px 10px; border-right: 1px solid var(--hair); min-width: 0; }
   .check:last-child { border-right: 0; }
   .check .label { display: block; margin-bottom: 3px; }
-  .check span.text { display: flex; gap: 5px; font-size: 12.5px; line-height: 1.35; }
+  .check span.text { display: flex; gap: 5px; font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; min-width: 0; }
   .check i { font-style: normal; font-weight: 700; flex: none; }
   .check.ok i { color: var(--ok); }
   .check.acted { background: var(--warn-tint); }
@@ -544,7 +544,8 @@ async function networkCheck(traceId) {
     try {
       const summary = await api(`/traces/${traceId}`);
       if (summary.outside.length) return [["leak", `Left the cluster: ${summary.outside.join(", ")}`], summary.spans];
-      return [["ok", summary.hosts.length ? `Only called ${summary.hosts.join(", ")}` : "No outbound calls"], summary.spans];
+      const hosts = [...new Set(summary.hosts.map((host) => host.split(".")[0]))];
+      return [["ok", hosts.length ? `Only called ${hosts.join(", ")}` : "No outbound calls"], summary.spans];
     } catch (_) {}
   }
   return [["na", "Trace not available"], 0];
