@@ -24,6 +24,7 @@ configMapGenerator:
       - ../sql/004_answer_cache.sql
       - ../sql/005_incident_systems.sql
       - ../sql/006_ops_events.sql
+      - ../sql/007_access_leases.sql
   - name: prometheus-config
     namespace: antara
     files:

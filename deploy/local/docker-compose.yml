@@ -4,6 +4,7 @@ services:
   k3s:
     image: rancher/k3s:v1.31.4-k3s1
     command: ["server", "--disable=metrics-server", "--write-kubeconfig-mode=644", "--tls-san=127.0.0.1"]
+    hostname: antara-server
     privileged: true
     tmpfs:
       - /run

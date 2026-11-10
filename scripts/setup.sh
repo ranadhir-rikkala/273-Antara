@@ -39,7 +39,7 @@ done
 if has_models ollama-0 && has_models ollama-1; then
   echo "models already present"
 else
-  kubectl -n antara delete networkpolicy default-deny --ignore-not-found >/dev/null
+  kubectl -n antara delete networkpolicy default-deny allow-egress-inside-cluster --ignore-not-found >/dev/null
   for pod in ollama-0 ollama-1; do
     for model in $MODELS; do
       kubectl -n antara exec "$pod" -- ollama pull "$model"
