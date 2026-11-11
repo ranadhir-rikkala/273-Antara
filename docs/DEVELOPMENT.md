@@ -83,6 +83,17 @@ To crash node 2 for real, `scripts/local-cluster.sh stop-worker`; `scripts/local
 
 The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
 
+## Optional: IBM Instana alongside the built-in monitoring
+
+Instana can receive the same traces as the two Jaegers, for a trial of an enterprise APM. It is off by default. **While it is on, monitoring data (span names, HTTP routes and status codes, timings, workflow IDs, Kubernetes inventory; checked: no question, answer or document text) leaves the network for IBM's cloud**, so turn it off before showing "nothing leaves the network".
+
+1. Start a 14-day trial at https://www.ibm.com/products/instana and open **More > Agents > Installing Instana Agents** to find the agent key and the endpoint host for your region (for example `ingress-red-saas.instana.io`).
+2. `cp deploy/instana/agent.env.example deploy/instana/agent.env` and fill in both values. The file is git-ignored.
+3. `scripts/instana.sh enable` installs the Instana agent (Helm chart 2.0.55, run through Docker, so nothing is installed on your machine) in its own `instana-agent` namespace, one per node, and adds Instana as a third trace destination of the OpenTelemetry collectors. Only the collectors get a new network rule, and only to the agent on port 4317.
+4. `scripts/instana.sh status` shows whether it is on; `scripts/instana.sh disable` removes everything and restores the sovereign setup.
+
+The agent downloads its sensors, including the OpenTelemetry receiver, from the Instana backend at start, so it only accepts traces with a valid key. On Kubernetes-in-Docker it also needs shared mounts and a machine ID on each node; `scripts/local-cluster.sh` prepares both. The agent adds about 0.9 GB of memory.
+
 ## Checks
 
 Read [AGENTS.md](../AGENTS.md) first: services hold the rules, adapters hold the I/O, and every change is test-first.
