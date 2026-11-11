@@ -9,6 +9,9 @@ for node in antara-k3s-k3s-1 antara-k3s-worker-1; do
   fi
 done
 kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/local/overlay | kubectl apply -f - >/dev/null
+if [ "$(kubectl get namespace instana-agent -o jsonpath='{.status.phase}' 2>/dev/null)" = "Active" ]; then
+  kubectl apply -f deploy/instana/collector.yaml >/dev/null
+fi
 for name in api gateway agent tools ingest-cpu ingest-gpu reconciler; do
   kubectl -n antara rollout restart "deploy/$name" >/dev/null
 done

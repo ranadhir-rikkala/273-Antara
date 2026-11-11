@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector
+  namespace: antara
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: 0.0.0.0:4317}
+    processors:
+      batch: {}
+    exporters:
+      otlp/jaeger-0:
+        endpoint: jaeger-0.jaeger-pods:4317
+        tls: {insecure: true}
+      otlp/jaeger-1:
+        endpoint: jaeger-1.jaeger-pods:4317
+        tls: {insecure: true}
+      otlp/instana:
+        endpoint: instana-agent.instana-agent.svc.cluster.local:4317
+        tls: {insecure: true}
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/jaeger-0, otlp/jaeger-1, otlp/instana]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-instana-agent
+  namespace: antara
+spec:
+  podSelector: {matchLabels: {app: otel-collector}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: instana-agent}}
+        - ipBlock: {cidr: 10.0.0.0/8}
+        - ipBlock: {cidr: 172.16.0.0/12}
+        - ipBlock: {cidr: 192.168.0.0/16}
+      ports:
+        - {protocol: TCP, port: 4317}

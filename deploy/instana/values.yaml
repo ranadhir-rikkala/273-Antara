@@ -1,0 +1,19 @@
+agent:
+  endpointPort: '"443"'
+  pod:
+    tolerations:
+      - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+    requests: {memory: 512Mi, cpu: 200m}
+    limits: {memory: 768Mi, cpu: "1"}
+cluster:
+  name: antara-local
+zone:
+  name: antara-laptop
+service:
+  create: true
+opentelemetry:
+  grpc:
+    enabled: true
+k8s_sensor:
+  deployment:
+    replicas: 1
