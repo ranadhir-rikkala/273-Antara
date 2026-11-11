@@ -11,3 +11,4 @@ deploy/local/.kube/
 .idea/
 evals/results/
 CLAUDE.md
+deploy/instana/agent.env
