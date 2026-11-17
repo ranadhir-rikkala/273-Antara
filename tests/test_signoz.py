@@ -127,3 +127,16 @@ async def test_a_trace_is_read_as_plain_spans_in_time_order() -> None:
 async def test_a_trace_with_no_spans_is_missing() -> None:
     fake = FakeSignoz({"status": "success", "data": {"data": {"results": [{"rows": None}]}}})
     assert await SignozTraces(client(fake)).get("f" * 32) is None
+
+
+async def test_without_a_password_requests_go_out_without_logging_in() -> None:
+    seen: list[httpx.Request] = []
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=vector(({}, "4")))
+
+    signoz = SignozClient("http://signoz:8080/signoz", "", "", transport=httpx.MockTransport(reply))
+    assert await SignozMetrics(signoz).scalar("q") == 4.0
+    assert [request.url.path for request in seen] == ["/signoz/api/v1/query"]
+    assert "authorization" not in seen[0].headers

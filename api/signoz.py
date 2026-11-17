@@ -31,13 +31,12 @@ class SignozClient:
 
     async def request(self, method: str, path: str, **kwargs: Any) -> Any:
         for attempt in range(2):
-            if self._token is None:
+            if self._token is None and self._password:
                 self._token = await self._login()
+            headers = {"Authorization": f"Bearer {self._token}"} if self._token else {}
             async with self._client() as client:
-                response = await client.request(
-                    method, path, headers={"Authorization": f"Bearer {self._token}"}, **kwargs
-                )
-            if response.status_code == 401 and attempt == 0:
+                response = await client.request(method, path, headers=headers, **kwargs)
+            if response.status_code == 401 and attempt == 0 and self._password:
                 self._token = None
                 continue
             return response.raise_for_status().json()

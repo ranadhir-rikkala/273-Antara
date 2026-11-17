@@ -2185,6 +2185,12 @@ spec:
               value: "false"
             - name: SIGNOZ_PROMETHEUS_ACTIVE__QUERY__TRACKER_ENABLED
               value: "false"
+            - name: SIGNOZ_IDENTN_TOKENIZER_ENABLED
+              value: "false"
+            - name: SIGNOZ_IDENTN_IMPERSONATION_ENABLED
+              value: "true"
+            - name: SIGNOZ_IDENTN_APIKEY_ENABLED
+              value: "false"
             - name: SIGNOZ_GLOBAL_EXTERNAL__URL
               value: "http://localhost:8000/signoz"
             - name: SIGNOZ_EMAILING_ENABLED

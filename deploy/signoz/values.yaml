@@ -51,6 +51,9 @@ signoz:
     signoz_user_root_email: admin@antara.local
     signoz_user_root_password: Antara-Observe-2026!
     signoz_user_root_org_name: antara
+    signoz_identn_impersonation_enabled: true
+    signoz_identn_tokenizer_enabled: false
+    signoz_identn_apikey_enabled: false
 
 telemetryStoreMigrator:
   enabled: true

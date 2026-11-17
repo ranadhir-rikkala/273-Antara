@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     gateway_url: str = "http://gateway:8080"
     gateway_pods_url: str = "http://gateway-pods:8080"
     signoz_url: str = "http://signoz:8080/signoz"
-    signoz_email: str = "admin@antara.local"
+    signoz_email: str = ""
     signoz_password: str = ""
     model_catalog_url: str = ""
     pinned_model_digests: dict[str, str] = {}

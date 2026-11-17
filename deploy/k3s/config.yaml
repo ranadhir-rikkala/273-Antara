@@ -23,6 +23,5 @@ stringData:
   DATABASE_URL: postgresql://antara:change-me-app-db@app-db:5432/antara
   POSTGRES_PASSWORD: change-me-app-db
   TEMPORAL_DB_PASSWORD: change-me-temporal-db
-  SIGNOZ_PASSWORD: Antara-Observe-2026!
   S3_ACCESS_KEY: antara
   S3_SECRET_KEY: change-me-object-store
