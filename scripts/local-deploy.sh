@@ -9,6 +9,9 @@ for node in antara-k3s-k3s-1 antara-k3s-worker-1; do
   fi
 done
 kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/local/overlay | kubectl apply -f - >/dev/null
+if [ -f deploy/local/.worker-off ]; then
+  scripts/local-cluster.sh single-node
+fi
 if [ "$(kubectl get namespace instana-agent -o jsonpath='{.status.phase}' 2>/dev/null)" = "Active" ]; then
   kubectl apply -f deploy/instana/collector.yaml >/dev/null
 fi

@@ -12,3 +12,4 @@ deploy/local/.kube/
 evals/results/
 CLAUDE.md
 deploy/instana/agent.env
+deploy/local/.worker-off
