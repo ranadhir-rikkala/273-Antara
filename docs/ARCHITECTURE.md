@@ -35,8 +35,8 @@ flowchart LR
         s3[("Object store<br/>SeaweedFS (S3)")]
 
         subgraph obs["Observability"]
-            otel["OpenTelemetry traces → Jaeger"]
-            prom["Prometheus → Grafana"]
+            otel["OpenTelemetry collectors (2)"]
+            signoz["SigNoz<br/>traces · metrics · alerts<br/>ClickHouse store"]
             ops["Ops console<br/>health · drills · harness"]
         end
     end
@@ -58,7 +58,7 @@ flowchart LR
 3. The worker classifies the request (question, action or incident), checks the answer cache, and searches **pgvector with the asker's groups inside the query**, so documents they may not read are never candidates.
 4. If no passage scores 0.6 or more, it answers that it could not find it, without calling the model. Otherwise it calls the **model gateway**, which caps concurrent model calls (busy → 429, retried with backoff), refuses calls if a model's digest does not match, and forwards to **Ollama** inside the cluster.
 5. The harness strips injected instructions from passages, redacts secrets and blocks unsafe answers. The browser polls the run and shows the answer with its sources and a five-check harness receipt.
-6. Every hop is traced with OpenTelemetry, so one Jaeger trace follows the question from the API through Temporal, the worker and the gateway to the model.
+6. Every hop is traced with OpenTelemetry, so one SigNoz trace follows the question from the API through Temporal, the worker and the gateway to the model.
 
 ## How an action flows (access request)
 

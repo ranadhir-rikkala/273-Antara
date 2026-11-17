@@ -11,7 +11,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 5. Close leftover test incidents so the console starts clean:
    `kubectl -n antara exec app-db-0 -- psql -U antara -c "update incidents set status='CLOSED', updated_at=now() where status='OPEN'"`
 6. Open both windows and hard-refresh (Cmd+Shift+R). On the console, click **Run egress check** once so "Egress: Blocked" shows.
-7. Open Grafana (`/grafana`) and Jaeger (`/jaeger`) in tabs.
+7. Open SigNoz (`/signoz`, sign in as `admin@antara.local`) in a tab: Services for the overview, Traces for one question end to end.
 8. Keep a screen recording of a full run as a backup.
 
 ## Run of show
@@ -30,7 +30,7 @@ Two browser windows side by side: the **helpdesk** (`http://localhost:8000`) on 
 | 7:45 | **GPU lane** | Console: **Disable GPU lane** → Run. Helpdesk: **Upload document** (any small `.md`). Then **Restore GPU lane**. | The Event log shows the experiment; the document is READY in ~20 s via CPU. "Capability-aware scheduling: GPU first, CPU after 20 seconds." (M6) |
 | 9:00 | **Reconciliation** | Console: **Corrupt vector index** → Run. | Within ~30 s the Event log shows the repair; the State reconciliation row stays at 0 stuck. (M4, M8) |
 | 10:00 | **Lease revoked** | Console: Event log. | "The 3-minute lease from the start has ended: a durable timer revoked it. That timer survives even a full node restart; we measured it." (M7, M9) |
-| 10:30 | **Scale and backpressure** | Console: **Load test** → Run. Switch to the Grafana tab after 30 s. | Cluster map: the dashed slots fill as KEDA adds pods (ingest 1→4, agent 2→4). The API 429s and Gateway 429s figures climb: overload gets 429, not a crash. (M2, M3, M4, M6) |
+| 10:30 | **Scale and backpressure** | Console: **Load test** → Run. Switch to the SigNoz tab after 30 s. | Cluster map: the dashed slots fill as KEDA adds pods (ingest 1→4, agent 2→4). The API 429s and Gateway 429s figures climb: overload gets 429, not a crash. (M2, M3, M4, M6) |
 | 12:30 | **Close** | Show [SECURITY.md](SECURITY.md) or the slide. | OWASP LLM Top 10: 10/10. Measured results. Limits: database failover is manual and node 1 holds the control plane; the production path is managed Postgres with automatic failover and nodes across zones. |
 
 **Optional finale (30 s):** turn off the Mac's Wi-Fi and ask one more question. It still answers.

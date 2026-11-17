@@ -58,10 +58,10 @@ Everything is reached through an SSH tunnel; nothing is exposed publicly.
 ssh -i antara-key.pem -L 8000:localhost:80 ubuntu@<server-public-ip>
 ```
 
-Then open http://localhost:8000. For the dashboards, port-forward on the server node:
+Then open http://localhost:8000; SigNoz is at http://localhost:8000/signoz. For the Temporal UI, port-forward on the server node:
 
 ```bash
-kubectl -n antara port-forward svc/grafana 3000 & kubectl -n antara port-forward svc/jaeger 16686 & kubectl -n antara port-forward svc/temporal-ui 8233:8080
+kubectl -n antara port-forward svc/temporal-ui 8233:8080
 ```
 
 ## Save credits

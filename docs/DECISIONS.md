@@ -45,7 +45,7 @@ Short records of the choices that shape Antara, what we gave up, and when we wou
 | Databases | app-db, temporal-db | Primary on node 1 streams WAL to a hot standby on node 2 through a replication slot |
 | Object store | object-store | Primary on node 1; a replica on node 2 follows it with `filer.sync` |
 | Model server | ollama | Active/standby: the gateway sends every call to the primary and fails over to the standby after a 2 s connect timeout |
-| Traces | jaeger | Two collectors fan every span out to both Jaegers |
+| Observability | otel-collector, signoz | Two collectors (one per node) forward every span to SigNoz, which also scrapes pod metrics; SigNoz itself is a single instance (ClickHouse on node 1) |
 
 **Why not active/active for everything.** A second database pod without replication is a second, different database, so state is replicated by protocol. The model server is active/standby because both nodes share the laptop's 8 CPUs: with both copies serving, four concurrent questions took 265 to 311 s and one failed; with one active copy they took 20 to 40 s.
 

@@ -23,7 +23,7 @@ Every number below was measured live on the local cluster in Colima on an Apple 
 | Model outage on two gateway copies | The outage switch reached both copies | Question answered after the outage in **35 s** |
 | Postgres write on a primary | Streamed to the standby on node 2 | Readable on the standby within **1 s**; lag **0 bytes**; the standby rejects writes |
 | Document uploaded to the object store | `filer.sync` copied it to the replica | Both copies went from 45 to **47** files with identical sizes within seconds |
-| One trace, two Jaegers | Two collectors sent every span to both | **41 / 41** spans on each copy |
+| One trace, two Jaegers (before the move to SigNoz) | Two collectors sent every span to both | **41 / 41** spans on each copy |
 | Four new questions at once, one vs two active Ollama copies on 8 shared CPUs | Two copies fought for the same cores | One copy: **20 to 40 s**, all answered. Two copies: **265 to 311 s**, one failed. Hence active/standby |
 | **Whole node restarted** with a pending approval and a running lease | Pods came back; state in Postgres and Temporal intact | Serving again in **52 s**; 21/21 documents intact; the pending request was approved afterwards and completed; the lease revoked on schedule |
 

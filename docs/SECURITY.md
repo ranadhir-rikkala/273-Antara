@@ -25,5 +25,6 @@ A default-deny NetworkPolicy lets pods talk only to each other, to cluster DNS a
 
 - Header sign-in (the demo mode) trusts the user named in the request. Real deployments use the OIDC mode, where identity comes from a signed token.
 - There is no per-user rate limit yet; the limits above are shared by everyone.
-- The observability tools (Grafana, Jaeger, Prometheus, Temporal UI) have no login. Anyone who can reach the app can read them, including every question and answer in the Temporal UI, which is read-only. Production puts them behind single sign-on.
+- SigNoz has a login, but its root password is a demo value committed in `deploy/signoz/values.yaml` and `deploy/k3s/config.yaml`. The Temporal UI has no login: anyone who can reach the app can read every question and answer in it (read-only). Production puts both behind single sign-on with secrets kept out of the repository.
+- SigNoz runs inside the cluster and its pods cannot reach the internet (its usage reporting is switched off and blocked). Its web page does ask the viewer's browser to load fonts from Google; no monitoring data goes with that request.
 - The application image `antara-app` is built from this repository on each deploy rather than pinned by digest.

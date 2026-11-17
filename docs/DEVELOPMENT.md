@@ -18,12 +18,11 @@ Add `--profile auth` to also start Keycloak, and set `AUTH_MODE=oidc` to make th
 | API docs | http://localhost:8000/docs |
 | Model gateway | http://localhost:8088/healthz |
 | Temporal UI | http://localhost:8233 |
-| Grafana (Antara overview dashboard) | http://localhost:3000 |
-| Jaeger traces | http://localhost:16686 |
-| Prometheus | http://localhost:9090 |
 | Keycloak (auth profile) | http://localhost:8180, users alice, bob, carol, dave with password `antara-dev` |
 | Postgres (app) | localhost:5433, user/password/db `antara` |
 | Object store (S3) | http://localhost:8333, key `antara` / `antara-secret` |
+
+The compose setup has no tracing backend; observability (SigNoz) runs in the cluster.
 
 The gateway forwards to Ollama on the host at `http://host.docker.internal:11434/v1`. Point it elsewhere with `LLM_UPSTREAM_URL` and `EMBED_UPSTREAM_URL`.
 
@@ -75,7 +74,9 @@ for pod in ollama-0 ollama-1; do kubectl -n antara exec $pod -- ollama pull qwen
 scripts/local-deploy.sh
 ```
 
-Grafana, Jaeger, Prometheus and the Temporal UI are at `/grafana`, `/jaeger`, `/prometheus` and `/temporal`, with no login: anyone who can reach the app can read them, including every question and answer in the Temporal UI. The Temporal UI is read-only.
+SigNoz (traces, metrics and alerts in one place) is at `/signoz`; sign in as `admin@antara.local` / `Antara-Observe-2026!` (a local demo password, set in `deploy/signoz/values.yaml`). The two OpenTelemetry collectors send it every span, and its own collector scrapes every pod annotated `prometheus.io/scrape`. The ops console reads its numbers from SigNoz. The Temporal UI is at `/temporal`, read-only, with no login: anyone who can reach the app can read every question and answer in it.
+
+SigNoz is rendered from its Helm chart into plain manifests by `scripts/render-signoz.sh` (rerun it after changing `deploy/signoz/values.yaml`). ClickHouse needs a small helper binary at start; it is baked into a local image (`deploy/signoz/udf`, checksum-pinned) instead of being downloaded, because pods cannot reach the internet.
 
 Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only between pods in the namespace, to cluster DNS, and to the Kubernetes API on private addresses. Downloading the models is the one step that needs the internet, so it lifts the policy for the download and `scripts/local-deploy.sh` puts it back. Models stay on the Ollama volume afterwards.
 
@@ -85,7 +86,7 @@ The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and roll
 
 ## Optional: IBM Instana alongside the built-in monitoring
 
-Instana can receive the same traces as the two Jaegers, for a trial of an enterprise APM. It is off by default. **While it is on, monitoring data (span names, HTTP routes and status codes, timings, workflow IDs, Kubernetes inventory; checked: no question, answer or document text) leaves the network for IBM's cloud**, so turn it off before showing "nothing leaves the network".
+Instana can receive the same traces as SigNoz, for a trial of an enterprise APM. It is off by default. **While it is on, monitoring data (span names, HTTP routes and status codes, timings, workflow IDs, Kubernetes inventory; checked: no question, answer or document text) leaves the network for IBM's cloud**, so turn it off before showing "nothing leaves the network".
 
 1. Start a 14-day trial at https://www.ibm.com/products/instana and open **More > Agents > Installing Instana Agents** to find the agent key and the endpoint host for your region (for example `ingress-red-saas.instana.io`).
 2. `cp deploy/instana/agent.env.example deploy/instana/agent.env` and fill in both values. The file is git-ignored.
@@ -137,7 +138,7 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 | Ranadhir | 1 async messaging, 5 reliable messaging, 7 failure recovery, effectively-once tools, incident fan-out/fan-in | Kill the agent worker mid-question; the answer still arrives |
 | Prajval | 6 retries, 10 GPU lane with CPU fallback, data lifecycle | Lose the GPU lane; a new document is still READY via CPU |
 | Vinayak | 3 load balancing, 4 backpressure, 8 state reconciliation | Flood: 429s from both API replicas and the model gateway; corrupt the index and watch it repair |
-| Manoj | 2 independent scaling (KEDA), 9 distributed monitoring | Worker pods scale out under the flood on the ops console, Grafana and Jaeger |
+| Manoj | 2 independent scaling (KEDA), 9 distributed monitoring | Worker pods scale out under the flood on the ops console and in SigNoz |
 
 ### Next tasks by owner
 
@@ -153,7 +154,7 @@ Shared by everyone, reviewed by Ranadhir: `common/`, `deploy/sql/`, `tests/fakes
 | Manoj | CI on GitHub Actions: `scripts/check.sh` on every push | 2 |
 | Manoj | Rehearse the demo twice with `docs/DEMO.md`, time each act, fix the script where reality differs, and record a backup video | — |
 | Manoj | Resource requests and limits on every app pod, and run the image as a non-root user | 2, 6 |
-| Manoj | Prometheus alert rules: pods not ready, queue backlog growing, 429 rate, model down | 6 |
+| Manoj | SigNoz alert rules and paging: pods not ready, queue backlog growing, 429 rate, model down | 6 |
 | Manoj | Backup and restore drill for the app database, measured against the 15-minute RPO | 8 |
 | Vinayak | Per-user rate limit, so one user cannot use up the shared admission budget | 4 |
 
