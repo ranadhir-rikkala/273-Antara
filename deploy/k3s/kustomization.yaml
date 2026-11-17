@@ -12,6 +12,7 @@ resources:
   - keda.yaml
   - network-policy.yaml
   - observability.yaml
+  - ../signoz
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
