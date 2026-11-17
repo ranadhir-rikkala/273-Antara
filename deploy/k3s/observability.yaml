@@ -70,12 +70,15 @@ data:
       otlp/jaeger-1:
         endpoint: jaeger-1.jaeger-pods:4317
         tls: {insecure: true}
+      otlp/signoz:
+        endpoint: signoz-otel-collector:4317
+        tls: {insecure: true}
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [otlp/jaeger-0, otlp/jaeger-1]
+          exporters: [otlp/jaeger-0, otlp/jaeger-1, otlp/signoz]
 ---
 apiVersion: v1
 kind: Service
