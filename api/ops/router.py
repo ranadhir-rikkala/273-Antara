@@ -12,18 +12,19 @@ from api.ops.adapters import (
     GatewayModelControl,
     KubernetesCluster,
     PostgresOpsStore,
-    PrometheusMetrics,
     SocketEgressProbe,
     TemporalReconcilerTrigger,
     TemporalWorkflows,
 )
 from api.ops.flood import run_flood
+from api.signoz import SignozClient, SignozMetrics
 from common.config import settings
 from common.db import pool
 from common.models import UserContext
 from common.queue_stats import TemporalQueueInspector
 
 router = APIRouter(prefix="/ops")
+signoz = SignozClient(settings.signoz_url, settings.signoz_email, settings.signoz_password)
 background: set[asyncio.Task] = set()
 
 
@@ -89,7 +90,7 @@ async def state(client: Client = Depends(temporal), ops: PostgresOpsStore = Depe
         TemporalWorkflows(client),
         cluster(),
         GatewayModelControl(settings.gateway_pods_url),
-        PrometheusMetrics(settings.prometheus_url),
+        SignozMetrics(signoz),
         ops,
     )
     return {**snapshot, "chaos_enabled": settings.chaos_enabled}

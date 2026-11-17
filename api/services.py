@@ -1,6 +1,7 @@
 import re
 import uuid
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlsplit
 
 from api.ports import ApprovalInbox, DocumentCatalog, ObjectStore, TraceStore
@@ -117,32 +118,30 @@ def inside_cluster(host: str) -> bool:
     return "." not in host or host.endswith((".svc", ".svc.cluster.local")) or host.startswith(PRIVATE_PREFIXES)
 
 
-def summarize_trace(trace: dict[str, object]) -> dict[str, object]:
-    processes = {key: value["serviceName"] for key, value in trace["processes"].items()}
+def summarize_trace(spans: list[dict[str, Any]]) -> dict[str, object]:
     services: list[str] = []
     hosts: list[str] = []
-    for span in sorted(trace["spans"], key=lambda item: item["startTime"]):
-        if processes[span["processID"]] not in services:
-            services.append(processes[span["processID"]])
-        tags = {tag["key"]: tag["value"] for tag in span["tags"]}
-        host = urlsplit(tags.get("http.url", "")).hostname
-        if tags.get("span.kind") == "client" and host and host not in hosts:
+    for span in sorted(spans, key=lambda item: item["start"]):
+        if span["service"] not in services:
+            services.append(span["service"])
+        host = urlsplit(span["url"]).hostname
+        if span["kind"] == "client" and host and host not in hosts:
             hosts.append(host)
     return {
         "services": services,
         "hosts": hosts,
         "outside": [host for host in hosts if not inside_cluster(host)],
-        "spans": len(trace["spans"]),
+        "spans": len(spans),
     }
 
 
 async def trace_summary(trace_id: str, traces: TraceStore) -> dict[str, object]:
     if not TRACE_ID.fullmatch(trace_id):
         raise NotFoundError("Trace not found")
-    trace = await traces.get(trace_id)
-    if trace is None:
+    spans = await traces.get(trace_id)
+    if spans is None:
         raise NotFoundError("Trace not found")
-    return summarize_trace(trace)
+    return summarize_trace(spans)
 
 
 async def register_upload(

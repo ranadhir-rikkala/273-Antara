@@ -40,7 +40,8 @@ MAX_FLOOD_DOCS, MAX_FLOOD_QUESTIONS = 300, 100
 RECENT_WORKFLOWS, OPEN_INCIDENTS, RECENT_EVENTS = 40, 5, 25
 REJECTED_QUERY = "sum(antara_api_rejected_total)"
 MODEL_BUSY_QUERY = 'sum(antara_gateway_rejected_total{reason="busy"})'
-THROUGHPUT_QUERY = 'sum by (instance) (rate({__name__=~"temporal_activity_execution_latency(_seconds)?_count"}[1m]))'
+POD_LABEL = "k8s.pod.name"
+THROUGHPUT_QUERY = f'sum by ("{POD_LABEL}") (rate({{"temporal_activity_execution_latency.count"}}[1m]))'
 
 
 class ChaosError(Exception):
@@ -96,7 +97,7 @@ async def snapshot(
     (rejected, _), (model_busy, _), (throughput, _) = await asyncio.gather(
         _safe(metrics.scalar(REJECTED_QUERY)),
         _safe(metrics.scalar(MODEL_BUSY_QUERY)),
-        _safe(metrics.by_label(THROUGHPUT_QUERY, "instance")),
+        _safe(metrics.by_label(THROUGHPUT_QUERY, POD_LABEL)),
     )
     counts, incidents, events = await asyncio.gather(
         store.counts(), store.open_incidents(OPEN_INCIDENTS), store.events(RECENT_EVENTS)

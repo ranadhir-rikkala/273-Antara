@@ -74,10 +74,14 @@ class Model:
 
 
 class Metrics:
+    def __init__(self) -> None:
+        self.grouped: list[tuple[str, str]] = []
+
     async def scalar(self, query: str) -> float | None:
         return 12.0
 
     async def by_label(self, query: str, label: str) -> dict[str, float]:
+        self.grouped.append((query, label))
         return {"agent-a": 0.5}
 
 
@@ -128,9 +132,21 @@ async def test_snapshot_reports_each_section_and_survives_partial_failures() -> 
     assert state["queues"][-1]["name"] == "reconciler" and "temporal busy" in state["queues"][-1]["error"]
     assert "visibility down" in state["errors"]["workflows"]
     assert state["metrics"] == {"rejected_429": 12.0, "model_busy_429": 12.0, "activities_per_second": {"agent-a": 0.5}}
+
     healthy = await services.snapshot(Queues(), Workflows(), Cluster(), Model(), Metrics(), Store())
     assert healthy["summary"]["workflows_running"] == 1 and healthy["errors"] == {}
     assert [node["name"] for node in healthy["nodes"]] == ["server", "worker"]
+
+
+async def test_worker_throughput_is_split_per_pod_using_signoz_metric_names() -> None:
+    metrics = Metrics()
+    await services.snapshot(Queues(), Workflows(), Cluster(), Model(), metrics, Store())
+    assert metrics.grouped == [
+        (
+            'sum by ("k8s.pod.name") (rate({"temporal_activity_execution_latency.count"}[1m]))',
+            "k8s.pod.name",
+        )
+    ]
 
 
 async def test_killing_a_worker_picks_a_ready_pod_and_records_it() -> None:

@@ -133,72 +133,35 @@ def test_a_run_is_readable_only_by_the_person_who_asked() -> None:
 
 
 def test_a_trace_summary_lists_services_and_called_hosts_and_flags_any_outside_the_cluster() -> None:
-    trace = {
-        "processes": {"p1": {"serviceName": "api"}, "p2": {"serviceName": "agent"}, "p3": {"serviceName": "gateway"}},
-        "spans": [
-            {
-                "processID": "p2",
-                "startTime": 20,
-                "tags": [
-                    {"key": "span.kind", "value": "client"},
-                    {"key": "http.url", "value": "http://gateway:8080/v1/chat"},
-                ],
-            },
-            {
-                "processID": "p1",
-                "startTime": 10,
-                "tags": [
-                    {"key": "span.kind", "value": "server"},
-                    {"key": "http.url", "value": "http://localhost:8000/agent/runs"},
-                ],
-            },
-            {
-                "processID": "p3",
-                "startTime": 30,
-                "tags": [
-                    {"key": "span.kind", "value": "client"},
-                    {"key": "http.url", "value": "http://ollama:11434/v1/chat"},
-                ],
-            },
-            {
-                "processID": "p3",
-                "startTime": 40,
-                "tags": [
-                    {"key": "span.kind", "value": "client"},
-                    {"key": "http.url", "value": "https://api.openai.com/v1/chat"},
-                ],
-            },
-            {
-                "processID": "p3",
-                "startTime": 50,
-                "tags": [
-                    {"key": "span.kind", "value": "client"},
-                    {"key": "http.url", "value": "http://10.42.0.9:9000/x"},
-                ],
-            },
-        ],
-    }
-    assert services.summarize_trace(trace) == {
+    spans = [
+        {"service": "agent", "start": 20, "kind": "client", "url": "http://gateway:8080/v1/chat"},
+        {"service": "api", "start": 10, "kind": "server", "url": "http://localhost:8000/agent/runs"},
+        {"service": "gateway", "start": 30, "kind": "client", "url": "http://ollama:11434/v1/chat"},
+        {"service": "gateway", "start": 40, "kind": "client", "url": "https://api.openai.com/v1/chat"},
+        {"service": "gateway", "start": 50, "kind": "client", "url": "http://10.42.0.9:9000/x"},
+        {"service": "agent", "start": 60, "kind": "client", "url": ""},
+    ]
+    assert services.summarize_trace(spans) == {
         "services": ["api", "agent", "gateway"],
         "hosts": ["gateway", "ollama", "api.openai.com", "10.42.0.9"],
         "outside": ["api.openai.com"],
-        "spans": 5,
+        "spans": 6,
     }
 
 
 class Traces:
-    def __init__(self, traces: dict[str, dict]) -> None:
+    def __init__(self, traces: dict[str, list[dict]]) -> None:
         self.traces = traces
         self.asked: list[str] = []
 
-    async def get(self, trace_id: str) -> dict | None:
+    async def get(self, trace_id: str) -> list[dict] | None:
         self.asked.append(trace_id)
         return self.traces.get(trace_id)
 
 
 async def test_trace_summaries_accept_only_real_trace_ids_and_report_missing_traces() -> None:
     trace_id = "0" * 31 + "a"
-    traces = Traces({trace_id: {"processes": {"p": {"serviceName": "api"}}, "spans": []}})
+    traces = Traces({trace_id: []})
     assert (await services.trace_summary(trace_id, traces))["services"] == []
     for bad in ("../../api/services", "A" * 32, "abc"):
         with pytest.raises(services.NotFoundError):

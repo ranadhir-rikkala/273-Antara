@@ -19,7 +19,7 @@ from api.metrics import PrometheusAdmissionMetrics
 from api.ops.router import router as ops_router
 from api.postgres import PostgresApprovalInbox, PostgresDocumentCatalog
 from api.runs import RunNotFoundError, RunUnavailableError, read_run_state
-from api.traces import JaegerTraces
+from api.signoz import SignozClient, SignozTraces
 from common import storage
 from common.config import settings
 from common.db import pool
@@ -40,6 +40,7 @@ class AppState:
 
 app_state = AppState()
 admission_metrics = PrometheusAdmissionMetrics()
+signoz = SignozClient(settings.signoz_url, settings.signoz_email, settings.signoz_password)
 inflight = InflightLimit(settings.max_inflight_requests, admission_metrics)
 ingest_gate = BacklogGate(INGEST_CPU, settings.max_ingest_backlog, admission_metrics)
 agent_gate = BacklogGate(AGENT, settings.max_agent_backlog, admission_metrics)
@@ -244,7 +245,7 @@ async def get_run(
 @app.get("/traces/{trace_id}")
 async def trace_summary(trace_id: str, user: UserContext = Depends(current_user)) -> dict[str, object]:
     try:
-        return await services.trace_summary(trace_id, JaegerTraces(settings.jaeger_query_url))
+        return await services.trace_summary(trace_id, SignozTraces(signoz))
     except services.NotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 

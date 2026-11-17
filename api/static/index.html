@@ -554,7 +554,7 @@ async function networkCheck(traceId) {
 async function showReceipt(node, state, traceId) {
   const groups = identity().groups.split(",").join(", ");
   const checks = harnessChecks(state, groups);
-  const traceLink = traceId ? el("a", { href: `/jaeger/trace/${traceId}`, target: "_blank", rel: "noopener" }, "View trace ↗") : "";
+  const traceLink = traceId ? el("a", { href: `/signoz/trace/${traceId}`, target: "_blank", rel: "noopener" }, "View trace ↗") : "";
   const grid = el("div", { class: "checks" },
     check("Network", ["pending", "Checking this answer's trace"]),
     check("Access", checks.access),

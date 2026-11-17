@@ -37,8 +37,9 @@ class Settings(BaseSettings):
 
     gateway_url: str = "http://gateway:8080"
     gateway_pods_url: str = "http://gateway-pods:8080"
-    prometheus_url: str = "http://prometheus:9090"
-    jaeger_query_url: str = "http://jaeger:16686/jaeger"
+    signoz_url: str = "http://signoz:8080/signoz"
+    signoz_email: str = "admin@antara.local"
+    signoz_password: str = ""
     model_catalog_url: str = ""
     pinned_model_digests: dict[str, str] = {}
     k8s_namespace: str = "antara"
