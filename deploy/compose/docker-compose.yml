@@ -18,7 +18,6 @@ x-app: &app
     LLM_BASE_URL: http://gateway:8080/v1
     LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
     EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
-    OTEL_ENDPOINT: http://jaeger:4317
     TEMPORAL_METRICS_PORT: "9464"
 
 services:
@@ -64,7 +63,6 @@ services:
     command: ["uvicorn", "gateway.app:app", "--host", "0.0.0.0", "--port", "8080"]
     environment:
       LLM_UPSTREAM_URL: ${LLM_UPSTREAM_URL:-http://host.docker.internal:11434/v1}
-      OTEL_ENDPOINT: http://jaeger:4317
       SERVICE_NAME: gateway
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -138,31 +136,6 @@ services:
       - ./keycloak/antara-realm.json:/opt/keycloak/data/import/antara-realm.json:ro
     ports:
       - "8180:8080"
-
-  jaeger:
-    image: jaegertracing/all-in-one:1.62.0
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "16686:16686"
-
-  prometheus:
-    image: prom/prometheus:v2.55.0
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana:11.3.0
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "3000:3000"
 
 volumes:
   temporal-data:
