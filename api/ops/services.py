@@ -30,8 +30,6 @@ REBALANCE = (
     "temporal",
     "temporal-ui",
     "otel-collector",
-    "prometheus",
-    "grafana",
 )
 STATELESS_OWNER = "ReplicaSet"
 OPERATOR_GROUP = "operators"

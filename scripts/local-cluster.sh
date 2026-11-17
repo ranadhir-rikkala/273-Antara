@@ -3,10 +3,10 @@ set -e
 cd "$(dirname "$0")/../deploy/local"
 export KUBECONFIG="$PWD/.kube/kubeconfig.yaml"
 WORKER_OFF="$PWD/.worker-off"
-DEPLOYMENTS="api gateway grafana otel-collector prometheus reconciler temporal temporal-ui"
+DEPLOYMENTS="api gateway otel-collector reconciler temporal temporal-ui"
 SCALED="agent ingest-cpu ingest-gpu tools"
 STANDBYS="app-db-standby temporal-db-standby object-store-replica"
-PAIRS="jaeger ollama"
+PAIRS="ollama"
 prepare_node() {
   docker exec "$1" mount --make-rshared /
   docker exec "$1" sh -c '[ -f /etc/machine-id ] || { rmdir /etc/machine-id 2>/dev/null; cat /proc/sys/kernel/random/uuid | tr -d - > /etc/machine-id; }'
@@ -93,7 +93,7 @@ case "${1:-up}" in
     ;;
   start-worker)
     start_worker
-    for name in api agent tools ingest-cpu ingest-gpu reconciler gateway temporal temporal-ui otel-collector prometheus grafana; do
+    for name in api agent tools ingest-cpu ingest-gpu reconciler gateway temporal temporal-ui otel-collector; do
       kubectl -n antara rollout restart "deploy/$name" >/dev/null
     done
     echo "Worker node back; request path rebalancing across both nodes"

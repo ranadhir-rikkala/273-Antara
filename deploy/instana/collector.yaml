@@ -12,11 +12,8 @@ data:
     processors:
       batch: {}
     exporters:
-      otlp/jaeger-0:
-        endpoint: jaeger-0.jaeger-pods:4317
-        tls: {insecure: true}
-      otlp/jaeger-1:
-        endpoint: jaeger-1.jaeger-pods:4317
+      otlp/signoz:
+        endpoint: signoz-otel-collector:4317
         tls: {insecure: true}
       otlp/instana:
         endpoint: instana-agent.instana-agent.svc.cluster.local:4317
@@ -26,7 +23,7 @@ data:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [otlp/jaeger-0, otlp/jaeger-1, otlp/instana]
+          exporters: [otlp/signoz, otlp/instana]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

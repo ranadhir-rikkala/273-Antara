@@ -26,7 +26,7 @@ case "${1:-status}" in
     kubectl apply -f deploy/instana/collector.yaml >/dev/null
     kubectl -n antara rollout restart deploy/otel-collector >/dev/null
     kubectl -n antara rollout status deploy/otel-collector --timeout=180s >/dev/null
-    echo "Instana enabled: traces now go to both Jaegers and to Instana at $INSTANA_ENDPOINT_HOST"
+    echo "Instana enabled: traces now go to SigNoz and to Instana at $INSTANA_ENDPOINT_HOST"
     echo "Monitoring data leaves the network while Instana is enabled. Turn it off with: scripts/instana.sh disable"
     ;;
   disable)
@@ -38,7 +38,7 @@ case "${1:-status}" in
       kubectl -n instana-agent patch instanaagent instana-agent --type=merge -p '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
     helm uninstall instana-agent --namespace instana-agent --wait >/dev/null 2>&1 || true
     kubectl delete namespace instana-agent --ignore-not-found --timeout=120s >/dev/null
-    echo "Instana disabled: traces go only to the two in-cluster Jaegers; nothing leaves the network"
+    echo "Instana disabled: traces go only to the in-cluster SigNoz; nothing leaves the network"
     ;;
   status)
     if enabled; then

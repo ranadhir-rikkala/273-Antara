@@ -269,8 +269,6 @@ async def test_restoring_the_worker_node_uncordons_it_and_rebalances_the_request
         "temporal",
         "temporal-ui",
         "otel-collector",
-        "prometheus",
-        "grafana",
     ]
     assert store.recorded == [("chaos.node-restored", "erin", {"node": "worker"})]
 

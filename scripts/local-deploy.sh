@@ -10,6 +10,7 @@ for node in antara-k3s-k3s-1 antara-k3s-worker-1; do
   fi
 done
 kubectl apply -f deploy/signoz/crds.yaml >/dev/null
+kubectl -n antara delete job signoz-telemetrystore-migrator --ignore-not-found >/dev/null
 kubectl wait --for=condition=Established --timeout=60s crd/clickhouseinstallations.clickhouse.altinity.com >/dev/null
 kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/local/overlay | kubectl apply -f - >/dev/null
 if [ -f deploy/local/.worker-off ]; then

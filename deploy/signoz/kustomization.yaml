@@ -5,3 +5,10 @@ resources:
   - crds.yaml
   - signoz.yaml
   - network-policy.yaml
+patches:
+  - target: {kind: "Deployment|StatefulSet|Job", name: "signoz.*"}
+    patch: |-
+      - {op: add, path: /spec/template/metadata/labels/antara~1service, value: signoz}
+  - target: {kind: ClickHouseInstallation, name: signoz-clickhouse}
+    patch: |-
+      - {op: add, path: /spec/templates/podTemplates/0/metadata/labels/antara~1service, value: signoz}

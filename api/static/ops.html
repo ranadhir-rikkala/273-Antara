@@ -323,10 +323,10 @@
       <section class="panel">
         <div class="panel-head"><h2>Observability</h2></div>
         <div class="tools">
-          <a href="/grafana/d/antara-overview?refresh=5s" target="_blank" rel="noopener"><b>Grafana</b><p>Queue backlog, 429 rate, model latency</p><span class="arrow">↗</span></a>
-          <a href="/jaeger/search?service=api" target="_blank" rel="noopener"><b>Jaeger</b><p>Distributed traces</p><span class="arrow">↗</span></a>
+          <a href="/signoz/services" target="_blank" rel="noopener"><b>SigNoz</b><p>Services: latency, error rate, throughput</p><span class="arrow">↗</span></a>
+          <a href="/signoz/traces-explorer" target="_blank" rel="noopener"><b>Traces</b><p>Distributed traces in SigNoz</p><span class="arrow">↗</span></a>
           <a href="/temporal/namespaces/default/workflows?query=WorkflowType%20!%3D%20%22ReconcilerWorkflow%22" target="_blank" rel="noopener"><b>Temporal</b><p>Workflow history (read-only)</p><span class="arrow">↗</span></a>
-          <a href="/prometheus/graph?g0.expr=sum%20by%20(reason)%20(antara_api_rejected_total)&amp;g0.tab=0" target="_blank" rel="noopener"><b>Prometheus</b><p>Raw metrics</p><span class="arrow">↗</span></a>
+          <a href="/signoz/metrics-explorer/summary" target="_blank" rel="noopener"><b>Metrics</b><p>Queue backlog, 429s, model latency in SigNoz</p><span class="arrow">↗</span></a>
         </div>
       </section>
       <section class="panel">
@@ -540,7 +540,7 @@ const ghosts = new Map();
 const GHOST_MS = 6000;
 
 const nodeIndex = new Map();
-const NODE_ORDER = ["api", "gateway", "agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "temporal", "temporal-db", "app-db", "object-store", "ollama", "otel-collector", "jaeger", "prometheus", "grafana", "temporal-ui"];
+const NODE_ORDER = ["api", "gateway", "agent", "tools", "ingest-cpu", "ingest-gpu", "reconciler", "temporal", "temporal-db", "app-db", "object-store", "ollama", "otel-collector", "signoz", "temporal-ui"];
 const nodeDown = new Set();
 
 function podSquares(app, pods) {
@@ -632,7 +632,7 @@ function renderMap(state, podsByApp, queues, rates) {
   const lane = () => el("div", { class: `lane ${busy ? "active" : ""}` });
   const col = (label, ...nodes) => el("div", { class: "col" }, el("span", { class: "label" }, label), ...nodes);
   const byApp = new Map(SERVICES.map((service) => [service.app, service]));
-  const obs = ["otel-collector", "jaeger", "prometheus", "grafana", "temporal-ui"].map((app) => {
+  const obs = ["otel-collector", "signoz", "temporal-ui"].map((app) => {
     const { squares } = podSquares(app, pods(app));
     return el("span", { class: "chipnode" }, ...squares, app);
   });
@@ -730,7 +730,7 @@ function render(state) {
     promise(8, "State reconciliation", "Stuck and corrupted documents are repaired automatically.",
       `${docs.PROCESSING || 0} stuck${lastReconcile ? ` · ${ago(lastReconcile)}` : ""}`, "Corrupt vector index"),
     promise(9, "Distributed monitoring", "Traces, metrics and events across every service.",
-      `${s.pods_total} pods`, "Jaeger, Grafana"),
+      `${s.pods_total} pods`, "SigNoz"),
     promise(10, "Capability-aware scheduling", "GPU lane first, CPU fallback after 20 s.",
       gpuReady ? "GPU lane up" : "Fallback to CPU", "Disable GPU lane", gpuReady ? "" : "alert"),
   );

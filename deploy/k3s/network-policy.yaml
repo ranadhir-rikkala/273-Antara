@@ -46,7 +46,7 @@ metadata:
   namespace: antara
 spec:
   podSelector:
-    matchExpressions: [{key: app, operator: In, values: [api, prometheus]}]
+    matchExpressions: [{key: app, operator: In, values: [api]}]
   policyTypes: [Egress]
   egress:
     - to:
