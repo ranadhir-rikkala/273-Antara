@@ -58,3 +58,67 @@ spec:
       volumes:
         - name: config
           configMap: {name: otel-collector}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-collector
+  namespace: antara
+data:
+  config.yaml: |
+    receivers:
+      filelog:
+        include: [/var/log/pods/antara_*/*/*.log]
+        exclude:
+          - /var/log/pods/antara_signoz-*/*/*.log
+          - /var/log/pods/antara_chi-signoz-*/*/*.log
+          - /var/log/pods/antara_log-collector-*/*/*.log
+        start_at: end
+        include_file_path: true
+        operators:
+          - type: container
+            id: container-parser
+    processors:
+      resource:
+        attributes:
+          - {key: service.name, from_attribute: k8s.container.name, action: insert}
+      batch: {}
+    exporters:
+      otlp:
+        endpoint: signoz-otel-collector:4317
+        tls: {insecure: true}
+    service:
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [resource, batch]
+          exporters: [otlp]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  namespace: antara
+spec:
+  selector: {matchLabels: {app: log-collector}}
+  template:
+    metadata: {labels: {app: log-collector}}
+    spec:
+      tolerations:
+        - {key: antara.dev/workers-only, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: collector
+          image: docker.io/signoz/signoz-otel-collector:v0.144.15
+          command: ["/signoz-otel-collector"]
+          args: ["--config=/etc/otelcol/config.yaml"]
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/otelcol, readOnly: true}
+            - {name: pods, mountPath: /var/log/pods, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: log-collector}
+        - name: pods
+          hostPath: {path: /var/log/pods}

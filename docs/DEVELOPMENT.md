@@ -74,7 +74,7 @@ for pod in ollama-0 ollama-1; do kubectl -n antara exec $pod -- ollama pull qwen
 scripts/local-deploy.sh
 ```
 
-SigNoz (traces, metrics and alerts in one place) is at `/signoz`, with no login: it runs in impersonation mode, so every visitor is an administrator. The two OpenTelemetry collectors send it every span, and its own collector scrapes every pod annotated `prometheus.io/scrape`. The ops console reads its numbers from SigNoz. The Temporal UI is at `/temporal`, read-only, also with no login. Anyone who can reach the app can read both, including every question and answer in the Temporal UI.
+SigNoz (traces, metrics and alerts in one place) is at `/signoz`, with no login: it runs in impersonation mode, so every visitor is an administrator. The two OpenTelemetry collectors send it every span, and its own collector scrapes every pod annotated `prometheus.io/scrape`. A log collector on each node (DaemonSet `log-collector`) tails the pods' log files and sends every line to SigNoz Logs, with the container name as the service. The ops console reads its numbers from SigNoz. The Temporal UI is at `/temporal`, read-only, also with no login. Anyone who can reach the app can read both, including every question and answer in the Temporal UI.
 
 SigNoz is rendered from its Helm chart into plain manifests by `scripts/render-signoz.sh` (rerun it after changing `deploy/signoz/values.yaml`). ClickHouse needs a small helper binary at start; it is baked into a local image (`deploy/signoz/udf`, checksum-pinned) instead of being downloaded, because pods cannot reach the internet.
 
