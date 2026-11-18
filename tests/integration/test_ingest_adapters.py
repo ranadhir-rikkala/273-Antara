@@ -71,6 +71,9 @@ async def test_catalog_lists_by_group_and_reports_missing_documents(db) -> None:
     ]
     assert await PostgresDocumentCatalog(db).list_for_groups(["employees"]) == []
     assert await PostgresDocumentCatalog(db).get("missing") is None
+    titled = await PostgresDocumentCatalog(db).list_for_groups(["contractors"], title=f"{PUBLIC[0]}.md")
+    assert [doc["document_id"] for doc in titled] == [PUBLIC[0]]
+    assert await PostgresDocumentCatalog(db).list_for_groups(["contractors"], title="other.md") == []
 
 
 async def test_catalog_details_carry_the_owner_and_who_may_read(db) -> None:

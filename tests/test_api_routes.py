@@ -117,3 +117,11 @@ async def test_uploads_refuse_other_groups_and_oversized_files(client: httpx.Asy
 async def test_trace_summaries_need_a_login_and_a_valid_trace_id(client: httpx.AsyncClient) -> None:
     assert (await client.get("/traces/" + "a" * 32)).status_code == 401
     assert (await client.get("/traces/not-a-trace", headers=ALICE)).status_code == 404
+
+
+async def test_documents_can_be_looked_up_by_exact_title(client: httpx.AsyncClient) -> None:
+    catalog = FakeCatalog()
+    api_app.app.dependency_overrides[api_app.catalog] = lambda: catalog
+    response = await client.get("/documents", params={"title": "vpn-faq.md"}, headers=ALICE)
+    assert response.status_code == 200
+    assert catalog.listed == (["employees"], "vpn-faq.md")

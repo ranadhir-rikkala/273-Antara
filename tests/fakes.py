@@ -390,7 +390,8 @@ class FakeCatalog:
     ) -> None:
         self.uploads.append({"document_id": document_id, "title": title, "groups": groups, "owner_id": owner_id})
 
-    async def list_for_groups(self, groups: list[str]) -> list[dict[str, Any]]:
+    async def list_for_groups(self, groups: list[str], title: str | None = None) -> list[dict[str, Any]]:
+        self.listed = (groups, title)
         return []
 
     async def get(self, document_id: str) -> dict[str, Any] | None:

@@ -39,7 +39,7 @@ class PostgresDocumentCatalog:
                     [(document_id, group) for group in groups],
                 )
 
-    async def list_for_groups(self, groups: list[str]) -> list[dict[str, Any]]:
+    async def list_for_groups(self, groups: list[str], title: str | None = None) -> list[dict[str, Any]]:
         async with self._pool.connection() as conn:
             rows = await (
                 await conn.execute(
@@ -50,8 +50,9 @@ class PostgresDocumentCatalog:
                     "WHERE document_id = d.document_id ORDER BY version_number DESC LIMIT 1) v ON true "
                     "WHERE d.deleted_at IS NULL AND EXISTS ("
                     "SELECT 1 FROM document_acl a WHERE a.document_id = d.document_id AND a.group_name = ANY(%s)) "
+                    "AND (%s::text IS NULL OR d.title = %s) "
                     "ORDER BY d.created_at DESC LIMIT 200",
-                    (groups,),
+                    (groups, title, title),
                 )
             ).fetchall()
         return [

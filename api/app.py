@@ -171,9 +171,11 @@ async def upload_document(
 
 @app.get("/documents")
 async def list_documents(
-    user: UserContext = Depends(current_user), documents: PostgresDocumentCatalog = Depends(catalog)
+    title: str | None = None,
+    user: UserContext = Depends(current_user),
+    documents: PostgresDocumentCatalog = Depends(catalog),
 ) -> list[dict[str, object]]:
-    return await documents.list_for_groups(user.groups)
+    return await documents.list_for_groups(user.groups, title)
 
 
 @app.get("/documents/{document_id}")
