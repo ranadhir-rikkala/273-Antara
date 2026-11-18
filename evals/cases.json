@@ -412,5 +412,19 @@
       ],
       "no_tools": true
     }
+  },
+  {
+    "id": "security-lead-fraud-threshold-is-not-hollow",
+    "question": "What fraud risk score blocks a transaction?",
+    "user": "dave",
+    "groups": "security-leads,employees",
+    "expect": {
+      "status": "COMPLETED",
+      "intent": "question",
+      "answer_contains_any": [
+        "85"
+      ],
+      "no_tools": true
+    }
   }
 ]

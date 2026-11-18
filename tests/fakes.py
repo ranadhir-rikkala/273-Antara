@@ -26,8 +26,10 @@ class FakeModel:
         reply: str = "An answer [1]",
         tool_message: dict[str, Any] | None = None,
         fail: bool = False,
+        replies: list[str] | None = None,
     ) -> None:
         self.reply = reply
+        self.replies = list(replies or [])
         self.tool_message = tool_message
         self.fail = fail
         self.chat_calls: list[list[dict[str, Any]]] = []
@@ -38,7 +40,7 @@ class FakeModel:
         if self.fail:
             raise RuntimeError("model unavailable")
         self.chat_calls.append(messages)
-        return self.reply
+        return self.replies.pop(0) if self.replies else self.reply
 
     async def generate_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
         self.chat_calls.append(messages)

@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from agent.guard import REDACTED, redact_secrets, sanitize_passage, unsafe_answer
@@ -43,6 +44,8 @@ SYSTEM_PROMPT = (
 INCIDENT_TITLE_LENGTH = 120
 UNSAFE_ANSWER = "I can't help with that safely. Please contact the IT helpdesk directly."
 NOT_FOUND_ANSWER = "I couldn't find that in company documents. Try rephrasing, or ask the IT helpdesk."
+HOLLOW_RETRY = "Answer the question in one or two full sentences using the passages, then cite them like [1]."
+HOLLOW = re.compile(r"\[\d+\]|[\s.,;:!?-]")
 
 
 class UnknownToolError(Exception):
@@ -101,6 +104,10 @@ def is_supported(chunks: list[ChunkResult], min_score: float) -> bool:
     return bool(chunks) and chunks[0].score >= min_score
 
 
+def is_hollow(answer: str) -> bool:
+    return not HOLLOW.sub("", answer)
+
+
 def guard_answer(answer: str, flags: list[str]) -> ModelTurn:
     if unsafe_answer(answer):
         return ModelTurn(answer=UNSAFE_ANSWER, flags=[*flags, "unsafe-answer-blocked"])
@@ -134,7 +141,13 @@ async def generate(request: GenerateRequest, model: ChatModel, min_score: float 
     flags = ["injection-stripped"] if any(sanitize_passage(c.text)[1] for c in request.chunks) else []
     messages = build_messages(request)
     if not request.allow_tools:
-        return guard_answer(await model.generate(messages), flags)
+        answer = await model.generate(messages)
+        if is_hollow(answer):
+            flags = [*flags, "hollow-answer-retried"]
+            answer = await model.generate([*messages, {"role": "user", "content": HOLLOW_RETRY}])
+        if is_hollow(answer):
+            return ModelTurn(answer=NOT_FOUND_ANSWER, flags=flags)
+        return guard_answer(answer, flags)
     message = await model.generate_with_tools(messages, schemas(request.tool_names))
     calls = message.get("tool_calls") or []
     if not calls:
@@ -241,6 +254,8 @@ async def lookup_cached_answer(
 
 
 async def store_cached_answer(request: CacheStoreRequest, embedder: Embedder, cache: AnswerCache) -> None:
+    if is_hollow(request.answer) or request.answer == NOT_FOUND_ANSWER:
+        return
     [embedding] = await embedder.embed([request.question])
     version_ids = sorted({citation.version_id for citation in request.citations})
     await cache.save(

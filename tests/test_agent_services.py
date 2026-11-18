@@ -354,3 +354,35 @@ async def test_a_cached_answer_records_what_the_harness_did_when_it_was_first_an
     audit = FakeAudit()
     await services.record_cached_harness(CachedAnswer("The key is [redacted].", []), "agent-2", audit)
     assert [action for _, action, _ in audit.entries] == ["harness.secrets-redacted", "harness.answered-from-sources"]
+
+
+def test_an_answer_with_no_words_is_hollow() -> None:
+    assert services.is_hollow("[1]")
+    assert services.is_hollow(" [1][2]. ")
+    assert services.is_hollow("")
+    assert not services.is_hollow("Scores of 85 or higher are blocked [1]")
+
+
+async def test_a_hollow_answer_is_asked_again_with_a_nudge() -> None:
+    model = FakeModel(replies=["[1]", "Scores of 85 or higher are blocked [1]"])
+    turn = await services.generate(GenerateRequest("fraud score?", [VPN_CHUNK], allow_tools=False), model)
+    assert turn.answer == "Scores of 85 or higher are blocked [1]"
+    assert "hollow-answer-retried" in turn.flags
+    assert len(model.chat_calls) == 2
+    assert model.chat_calls[1][-1] == {"role": "user", "content": services.HOLLOW_RETRY}
+
+
+async def test_a_second_hollow_answer_falls_back_to_not_found() -> None:
+    model = FakeModel(replies=["[1]", "[1]."])
+    turn = await services.generate(GenerateRequest("fraud score?", [VPN_CHUNK], allow_tools=False), model)
+    assert turn.answer == services.NOT_FOUND_ANSWER
+    assert "hollow-answer-retried" in turn.flags
+
+
+async def test_hollow_or_not_found_answers_are_never_cached() -> None:
+    from common.models import CacheStoreRequest
+
+    model, cache = FakeModel(), FakeAnswerCache()
+    for answer in ("[1]", services.NOT_FOUND_ANSWER):
+        await services.store_cached_answer(CacheStoreRequest("q?", ALICE, answer, [VPN_CHUNK]), model, cache)
+    assert cache.entries == []
