@@ -23,7 +23,7 @@ class RunHandle(Protocol):
 
     async def describe(self) -> Any: ...
 
-    async def result(self, result_type: Any = None) -> Any: ...
+    async def result(self) -> Any: ...
 
 
 async def read_run_state(handle: RunHandle) -> AgentRunState:
@@ -37,5 +37,5 @@ async def read_run_state(handle: RunHandle) -> AgentRunState:
     except RPCError as error:
         raise RunNotFoundError("Run not found") from error
     if description.status == WorkflowExecutionStatus.COMPLETED:
-        return await handle.result(result_type=AgentRunState)
+        return await handle.result()
     raise RunUnavailableError("Run status is temporarily unavailable")

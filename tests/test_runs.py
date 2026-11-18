@@ -27,7 +27,7 @@ class FakeHandle:
             raise self._describe
         return self._describe
 
-    async def result(self, result_type=None):
+    async def result(self):
         return self._result
 
 

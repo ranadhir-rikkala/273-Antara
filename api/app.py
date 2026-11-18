@@ -23,7 +23,7 @@ from api.signoz import SignozClient, SignozTraces
 from common import storage
 from common.config import settings
 from common.db import pool
-from common.models import AgentRunRequest, ApprovalDecision, ConversationTurn, UserContext
+from common.models import AgentRunRequest, AgentRunState, ApprovalDecision, ConversationTurn, UserContext
 from common.names import Signals, Workflows
 from common.queue_stats import TemporalBacklogReader
 from common.queues import AGENT, INGEST_CPU
@@ -232,7 +232,7 @@ async def get_run(
     run_id: str, user: UserContext = Depends(current_user), client: Client = Depends(temporal)
 ) -> dict[str, object]:
     try:
-        state = await read_run_state(client.get_workflow_handle(run_id))
+        state = await read_run_state(client.get_workflow_handle(run_id, result_type=AgentRunState))
     except RunNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except RunUnavailableError as error:

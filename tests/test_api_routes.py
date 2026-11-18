@@ -45,7 +45,7 @@ class Temporal:
     async def start_workflow(self, workflow: str, arg: object, id: str, task_queue: str) -> None:
         self.started.append(id)
 
-    def get_workflow_handle(self, run_id: str) -> Handle:
+    def get_workflow_handle(self, run_id: str, result_type: type | None = None) -> Handle:
         return Handle(self.runs.get(run_id))
 
 
