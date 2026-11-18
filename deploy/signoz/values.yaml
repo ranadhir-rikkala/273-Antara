@@ -22,8 +22,8 @@ clickhouse:
   persistence:
     size: 10Gi
   resources:
-    requests: {cpu: 100m, memory: 512Mi}
-    limits: {memory: 2Gi}
+    requests: {cpu: 100m, memory: 1Gi}
+    limits: {memory: 4Gi}
   zookeeper:
     resources:
       requests: {cpu: 50m, memory: 256Mi}
