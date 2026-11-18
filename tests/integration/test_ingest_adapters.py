@@ -93,6 +93,10 @@ async def test_version_status_and_reconciler_scan(db) -> None:
     stale = await PostgresVersionScanner(db).stale_versions(["PROCESSING"], 0)
     assert [request.version_id for request in stale] == [PUBLIC[1]]
     assert await PostgresVersionScanner(db).stale_versions(["PROCESSING"], 60) == []
+    await versions.set_status(PUBLIC[1], "FAILED", "429 Too Many Requests")
+    failed = await PostgresVersionScanner(db).failed_versions(0)
+    assert [(request.version_id, error) for request, error in failed] == [(PUBLIC[1], "429 Too Many Requests")]
+    assert await PostgresVersionScanner(db).failed_versions(60) == []
 
 
 async def test_approval_inbox_lists_and_records_decisions(db) -> None:

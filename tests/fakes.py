@@ -348,13 +348,19 @@ class FakeSearchIndex:
 
 
 class FakeVersionScanner:
-    def __init__(self, stale: list[IngestRequest]) -> None:
+    def __init__(self, stale: list[IngestRequest], failed: list[tuple[IngestRequest, str]] | None = None) -> None:
         self.stale = stale
+        self.failed = failed or []
         self.queries: list[tuple[list[str], int]] = []
+        self.failed_queries: list[int] = []
 
     async def stale_versions(self, statuses: list[str], older_than_minutes: int) -> list[IngestRequest]:
         self.queries.append((statuses, older_than_minutes))
         return self.stale
+
+    async def failed_versions(self, older_than_minutes: int) -> list[tuple[IngestRequest, str]]:
+        self.failed_queries.append(older_than_minutes)
+        return self.failed
 
 
 class FakeWorkflowInspector:

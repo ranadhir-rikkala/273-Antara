@@ -20,6 +20,19 @@ class PostgresVersionScanner:
             ).fetchall()
         return [IngestRequest(*row) for row in rows]
 
+    async def failed_versions(self, older_than_minutes: int) -> list[tuple[IngestRequest, str]]:
+        async with self._pool.connection() as conn:
+            rows = await (
+                await conn.execute(
+                    "SELECT v.document_id::text, v.version_id::text, v.object_key, v.content_type, "
+                    "coalesce(v.error, '') FROM document_versions v JOIN documents d USING (document_id) "
+                    "WHERE v.status = 'FAILED' AND d.deleted_at IS NULL "
+                    "AND v.updated_at < now() - make_interval(mins => %s)",
+                    (older_than_minutes,),
+                )
+            ).fetchall()
+        return [(IngestRequest(*row[:4]), row[4]) for row in rows]
+
 
 class TemporalWorkflowInspector:
     def __init__(self, client: Client) -> None:
