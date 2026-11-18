@@ -2,15 +2,38 @@
 
 ### Quick start
 
-Needs Docker with 8 CPUs and 16 GB of memory (a computer with 24 GB or more), `kubectl`, `curl` and about 40 GB of free disk. On a Mac: `brew install colima docker kubectl && colima start --cpu 8 --memory 16`. On Windows, run it inside WSL2.
+Needs a computer with 24 GB of RAM or more and about 60 GB of free disk. Docker gets 8 CPUs and 16 GB. Nothing else has to be installed first; the steps below install it.
+
+**Mac**
 
 ```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"   # then run the two lines it prints
+brew install colima docker kubectl
+colima start --cpu 8 --memory 16 --disk 60
 git clone https://github.com/ranadhir-rikkala/273-Antara.git
 cd 273-Antara
 scripts/setup.sh
 ```
 
-The script starts a two-node Kubernetes cluster in Docker, installs KEDA, builds and deploys every service (34 pods), downloads the two models, blocks internet access again and loads the demo documents. The first run takes about 20 minutes, mostly downloads; running it again only repairs what is missing. Then open the helpdesk at http://localhost:8000 and the operations console at http://localhost:8000/ops (choose erin · Operator).
+**Windows:** run `wsl --install -d Ubuntu` in an administrator PowerShell and restart. Install Docker Desktop, turn on WSL integration for Ubuntu, and give it 8 CPUs and 16 GB (Settings > Resources). Then follow the Linux steps inside Ubuntu, skipping the Docker line.
+
+**Linux (Ubuntu)**
+
+```bash
+sudo apt update && sudo apt install -y git curl python3
+curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER && newgrp docker
+curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install kubectl /usr/local/bin/
+git clone https://github.com/ranadhir-rikkala/273-Antara.git
+cd 273-Antara
+scripts/setup.sh
+```
+
+`scripts/setup.sh` starts a two-node Kubernetes cluster in Docker, installs KEDA, builds and deploys every service (about 36 pods, including SigNoz for traces, metrics and logs), downloads the two models, blocks internet access again and loads the demo documents. The first run takes 20 to 40 minutes, mostly downloads; running it again only repairs what is missing.
+
+Then open the helpdesk at http://localhost:8000, the operations console at http://localhost:8000/ops (choose erin · Operator) and SigNoz at http://localhost:8000/signoz. `python3 scripts/smoke.py` clicks every button and should end with 42/42 passed.
+
+Later starts: start Docker (`colima start --cpu 8 --memory 16` on a Mac), then `scripts/local-cluster.sh`. To run on one node with fewer pods, `scripts/local-cluster.sh worker-off`; `worker-on` brings node 2 back.
 
 ### Abstract
 
