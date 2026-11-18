@@ -82,7 +82,7 @@ Pods cannot reach the internet: a default-deny NetworkPolicy allows traffic only
 
 To crash node 2 for real, `scripts/local-cluster.sh stop-worker`; `scripts/local-cluster.sh start-worker` brings it back and rebalances the request path.
 
-The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
+The app is at http://localhost:8000. `scripts/local-deploy.sh` rebuilds and rolls out after every code change. `python3 scripts/smoke.py` then clicks every button through the API (pages, questions as each demo user, ticket, approval, incident, upload and delete, and every ops console action with its recovery) and prints PASS or FAIL for each; it needs only the standard library. Add `--flood` to include a small flood. Demo documents are in `demo/policies/`; `python scripts/ask.py "question" --user alice --groups employees` runs one question from the terminal.
 
 ## Optional: IBM Instana alongside the built-in monitoring
 
